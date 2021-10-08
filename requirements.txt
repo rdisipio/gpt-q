@@ -1,5 +1,7 @@
 torch
 torch-vision
+pytorch-lightning
 pandas
 tdqm
 tokenizers
+pennylane
