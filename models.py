@@ -18,10 +18,10 @@ class QConv1d(pl.LightningModule):
         self.out_channels = 3  # ie Query, Key, Value
         self.padding = padding
         self.stride = stride
-        self.kernel_size = self.kernel_size
-        assert kernel_size >= self.out_channels
-        self.dev = qml.device(q_device, wires=self.n_qubits)
-        self.weights = np.random.uniform(high= 2 * np.pi, size=(n_qlayers, self.n_qubits))
+        self.kernel_size = kernel_size
+        assert self.kernel_size >= self.out_channels
+        self.dev = qml.device(q_device, wires=self.kernel_size)
+        self.weights = np.random.uniform(high= 2 * np.pi, size=(n_qlayers, self.kernel_size))
 
         @qml.qnode(device=self.dev, interface="torch")
         def _circuit(inputs, weights):
@@ -35,9 +35,9 @@ class QConv1d(pl.LightningModule):
     
     def draw(self):
         # build circuit by sending dummy data through it
-        _ = self.circuit(inputs=torch.from_numpy(np.zeros(self.kernel_size)))
-        print(self.circuit.qnode.draw())
-        self.circuit.zero_grad()
+        _ = self.qconv(inputs=torch.from_numpy(np.zeros(self.kernel_size)))
+        print(self.qconv.qnode.draw())
+        self.qconv.zero_grad()
 
     def forward(self, x):
         batch_size, seq_len, embed_dim = x.shape
