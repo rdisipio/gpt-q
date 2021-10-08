@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch._C import strided
 from torch.nn import functional as F
 import pytorch_lightning as pl
 import pennylane as qml
@@ -8,14 +7,14 @@ from pennylane import numpy as np
 from pennylane.templates import RandomLayers
 
 
-class QConv1D(pl.LightningModule):
+class QConv1d(pl.LightningModule):
     def __init__(self,
                  kernel_size,
                  n_qlayers=1,
                  q_device='default.qubit',
                  stride=1,
                  padding=0):
-        super(QConv1D, self).__init__()
+        super(QConv1d, self).__init__()
         self.out_channels = 3  # ie Query, Key, Value
         self.padding = padding
         self.stride = stride
