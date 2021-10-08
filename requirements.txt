@@ -1,3 +1,5 @@
 torch
 torch-vision
-
+pandas
+tdqm
+tokenizers
