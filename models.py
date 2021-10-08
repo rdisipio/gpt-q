@@ -10,12 +10,13 @@ from pennylane.templates import RandomLayers
 class QConv1d(pl.LightningModule):
     def __init__(self,
                  kernel_size,
+                 out_channels=3,  # ie Query, Key, Value
                  n_qlayers=1,
                  q_device='default.qubit',
                  stride=1,
                  padding=0):
         super(QConv1d, self).__init__()
-        self.out_channels = 3  # ie Query, Key, Value
+        self.out_channels = out_channels
         self.padding = padding
         self.stride = stride
         self.kernel_size = kernel_size
@@ -43,7 +44,7 @@ class QConv1d(pl.LightningModule):
         batch_size, seq_len, embed_dim = x.shape
         x = F.pad(x, (self.padding, self.padding), "constant", 0)
         out_dim = int((embed_dim + 2 * self.padding - self.kernel_size) / self.stride) + 1
-        output = [torch.zeros((batch_size, seq_len, out_dim)) for _ in range(self.out_dim)]
+        output = [torch.zeros((batch_size, seq_len, out_dim)) for _ in range(self.out_channels)]
         
         for i in range(batch_size):
             for j in range(seq_len):
