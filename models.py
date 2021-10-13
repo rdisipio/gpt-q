@@ -99,14 +99,14 @@ class FeedForward(pl.LightningModule):
         return torch.squeeze(x, dim=-1)
 
 
-class Attention(pl.LightningModule):
+class MultiHeadAttention(pl.LightningModule):
     def __init__(self,
                  embed_dim: int=8,
                  n_heads: int=2,
                  n_qubits: int=5,
                  n_qlayers: int=1,
                  ):
-        super(Attention, self).__init__()
+        super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.n_heads = n_heads
         padding = (n_qubits - 1) // 2  # does not change embed_dim
@@ -120,19 +120,21 @@ class Attention(pl.LightningModule):
         self.c_proj = QConv1d(kernel_size=n_qubits,
                               out_channels=1,
                               padding=padding)
-    
+
     def split_heads(self, x):
         new_shape = x.size()[:-1] + (self.n_heads, x.size(-1) // self.n_heads)
         x = x.view(*new_shape)
         return x.permute(0, 2, 1, 3) 
 
-    def _attn(self, q, k, v, attn_mask=None):
-        scores  = torch.matmul(q, k.transpose(-2, -1))
+    def _attn(self, q, k, v, mask=None):
+        scores = torch.matmul(q, k.transpose(-2, -1))
         sf = math.sqrt(v.size(-1))
         scores = scores / sf
         #nd, ns  = scores.size(-2), scores.size(-1)
-        if attn_mask is not None: 
-            scores = scores + attn_mask
+        if mask is not None:
+            mask = mask.unsqueeze(1)
+            #scores = scores.masked_fill(mask == 0, -1e9)
+            scores = scores.float().masked_fill(mask, -float('inf')).type_as(scores)
         scores  = self.softmax(scores)
         scores  = self.dropout(scores)
         outputs = torch.matmul(scores, v)
@@ -168,7 +170,7 @@ class TransformerBlock(pl.LightningModule):
                  n_qlayers: int=1,
                  dropout=0.1):
         super(TransformerBlock, self).__init__()
-        self.attn = Attention(embed_dim,
+        self.attn = MultiHeadAttention(embed_dim,
                               n_heads=n_heads,
                               n_qubits=n_qubits,
                               n_qlayers=n_qlayers)
@@ -190,6 +192,7 @@ class GPTQ(pl.LightningModule):
     def __init__(self,
                  embed_dim,
                  vocab_size,
+                 output_dim,
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
@@ -203,12 +206,12 @@ class GPTQ(pl.LightningModule):
         self.wpe = nn.Embedding(n_ctx, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(dropout)
         self.ln_f    = LayerNorm(embed_dim)
-        self.out     = nn.Linear(embed_dim, vocab_size, bias=False)
+        self.out     = nn.Linear(embed_dim, output_dim, bias=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.init_weights()
 
     def init_weights(self):
-        self.out.weight = self.wte.weight
+        #self.out.weight = self.wte.weight
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
@@ -220,22 +223,24 @@ class GPTQ(pl.LightningModule):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
     
-    def forward(self, src, labels=None, pos_ids=None):
+    def forward(self, src_ids, tgt_ids=None, pos_ids=None):
         if pos_ids is None:
-            pos_ids = torch.arange(0, src.size(-1)).unsqueeze(0)
-        x_tokens = self.wte(src)
+            pos_ids = torch.arange(0, src_ids.size(-1)).unsqueeze(0)
+        x_tokens = self.wte(src_ids)
         x_pos = self.wpe(pos_ids)
         x = x_tokens + x_pos
         x = self.dropout(x)
         for i in range(self.n_layers): 
             x = self.h[i](x)
         x = self.ln_f(x)
+        print("output of transformer blocks:", x.shape)
         logits = self.out(x)
+        print("logits:", logits.shape)
         outputs = (logits,) + (x,)
 
-        if labels is not None:
+        if tgt_ids is not None:
             shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
+            shift_labels = tgt_ids[..., 1:].contiguous()
             loss = self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             outputs = (loss,) + outputs
             return outputs
