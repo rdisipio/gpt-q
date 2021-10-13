@@ -212,9 +212,9 @@ class GPTQ(pl.LightningModule):
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
-        if isinstance(module, (nn.Linear, nn.Embedding, Conv1D)):
+        if isinstance(module, (nn.Linear, nn.Embedding)):
             module.weight.data.normal_(mean=0.0, std=0.02)
-            if isinstance(module, (nn.Linear, Conv1D)) and module.bias is not None:
+            if isinstance(module, (nn.Linear)) and module.bias is not None:
                 module.bias.data.zero_()
         elif isinstance(module, nn.LayerNorm):
             module.bias.data.zero_()
@@ -223,12 +223,14 @@ class GPTQ(pl.LightningModule):
     def forward(self, src, labels=None, pos_ids=None):
         if pos_ids is None:
             pos_ids = torch.arange(0, src.size(-1)).unsqueeze(0)
-        x = self.wte(src) + self.wpe(pos_ids)
+        x_tokens = self.wte(src)
+        x_pos = self.wpe(pos_ids)
+        x = x_tokens + x_pos
         x = self.dropout(x)
-        for i in range(self.nlayers): 
+        for i in range(self.n_layers): 
             x = self.h[i](x)
-        x     = self.ln_f(x)
-        logits  = self.out(x)
+        x = self.ln_f(x)
+        logits = self.out(x)
         outputs = (logits,) + (x,)
 
         if labels is not None:
