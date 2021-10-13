@@ -1,10 +1,16 @@
+import math
+import copy
 import torch
-from torch import nn
-from torch.nn import functional as F
+
 import pytorch_lightning as pl
 import pennylane as qml
+
+from torch import nn
+from torch.nn import functional as F
+from torch.nn.modules import ModuleList
+from torch.nn.modules.normalization import LayerNorm
 from pennylane import numpy as np
-from pennylane.templates import RandomLayers
+#from pennylane.templates import RandomLayers
 
 
 class QConv1d(pl.LightningModule):
@@ -53,7 +59,6 @@ class QConv1d(pl.LightningModule):
                     q_result = self.qconv(x_slice)
                     for c in range(self.out_channels):
                         output[i, j, k, c] = q_result[c]
-                    #    output[c][i, j, k] = q_result[c]
         return output
 
 
@@ -65,12 +70,13 @@ class FeedForward(pl.LightningModule):
                  embed_dim,
                  boom_factor=4,
                  dropout=0.1,
-                 kernel_size=5):
+                 n_qubits: int=5,
+                 n_qlayers: int=1):
         super(FeedForward, self).__init__()
-        assert kernel_size % 2 == 1, "Kernel size must be odd to conserve embedding dimension"
-        padding = (kernel_size - 1) // 2
+        assert n_qubits % 2 == 1, "Kernel size must be odd to conserve embedding dimension"
+        padding = (n_qubits - 1) // 2
 
-        self.c_fc = QConv1d(kernel_size, out_channels=boom_factor, padding=padding)
+        self.c_fc = QConv1d(kernel_size=n_qubits, out_channels=boom_factor, padding=padding, n_qlayers=n_qlayers)
 
         s_inv = (boom_factor * embed_dim - boom_factor) // (embed_dim - 1)
         self.c_proj = QConv1d(kernel_size=boom_factor, out_channels=1, stride=s_inv)
@@ -90,5 +96,145 @@ class FeedForward(pl.LightningModule):
         x = self.activation(x)
         x = self.c_proj(x)
         x = self.dropout(x)
+        return torch.squeeze(x, dim=-1)
+
+
+class Attention(pl.LightningModule):
+    def __init__(self,
+                 embed_dim: int=8,
+                 n_heads: int=2,
+                 n_qubits: int=5,
+                 n_qlayers: int=1,
+                 ):
+        super(Attention, self).__init__()
+        self.embed_dim = embed_dim
+        self.n_heads = n_heads
+        padding = (n_qubits - 1) // 2  # does not change embed_dim
+        self.c_attn = QConv1d(kernel_size=n_qubits,
+                              out_channels=3,
+                              n_qlayers=n_qlayers,
+                              padding=padding)
+        self.softmax = nn.Softmax(dim=-1)
+        #self.register_buffer("bias", torch.tril(torch.ones(n_ctx, n_ctx)).view(1, 1, n_ctx, n_ctx))
+        self.dropout = nn.Dropout(0.1)
+        self.c_proj = QConv1d(kernel_size=n_qubits,
+                              out_channels=1,
+                              padding=padding)
+    
+    def split_heads(self, x):
+        new_shape = x.size()[:-1] + (self.n_heads, x.size(-1) // self.n_heads)
+        x = x.view(*new_shape)
+        return x.permute(0, 2, 1, 3) 
+
+    def _attn(self, q, k, v, attn_mask=None):
+        scores  = torch.matmul(q, k.transpose(-2, -1))
+        sf = math.sqrt(v.size(-1))
+        scores = scores / sf
+        #nd, ns  = scores.size(-2), scores.size(-1)
+        if attn_mask is not None: 
+            scores = scores + attn_mask
+        scores  = self.softmax(scores)
+        scores  = self.dropout(scores)
+        outputs = torch.matmul(scores, v)
+        return outputs
+
+    def merge_heads(self, x):
+        x = x.permute(0, 2, 1, 3).contiguous()
+        new_shape = x.size()[:-2] + (x.size(-2) * x.size(-1),)
+        return x.view(*new_shape)
+
+    def forward(self, x):
+        x = self.c_attn(x)
+        print("after qconv 1->3:", x.shape)
+        q, k, v = x[:, :, :,  0], x[:, :, :, 1], x[:, :, :, 2]
+        print("shapes: q:", q.shape, "k:", k.shape, "v:", v.shape)
+        q, k, v  = self.split_heads(q), self.split_heads(k), self.split_heads(v)
+        print("after split heads:", q.shape, k.shape, v.shape)
+        out      = self._attn(q, k, v)
+        print("attention:", out.shape)
+        out      = self.merge_heads(out)
+        print("merged heads:", out.shape)
+        out      = self.c_proj(out)
+        out = torch.squeeze(out, dim=-1)
+        print("attn output:", out.shape)
+        return out
+
+
+class TransformerBlock(pl.LightningModule):
+    def __init__(self,
+                 embed_dim,
+                 n_heads: int=2,
+                 n_qubits: int=5,
+                 n_qlayers: int=1,
+                 dropout=0.1):
+        super(TransformerBlock, self).__init__()
+        self.attn = Attention(embed_dim,
+                              n_heads=n_heads,
+                              n_qubits=n_qubits,
+                              n_qlayers=n_qlayers)
+        self.feedforward = FeedForward(embed_dim,
+                                       boom_factor=4,
+                                       dropout=dropout,
+                                       n_qubits=n_qubits,
+                                       n_qlayers=n_qlayers)
+        self.ln_1 = LayerNorm(embed_dim)
+        self.ln_2 = LayerNorm(embed_dim)
+
+    def forward(self, x):
+        x = x + self.attn(self.ln_1(x))
+        x = x + self.feedforward(self.ln_2(x))
         return x
-        #return self.dropout(self.c_proj(self.act(self.c_fc(x))))
+
+
+class GPTQ(pl.LightningModule):
+    def __init__(self,
+                 embed_dim,
+                 vocab_size,
+                 n_heads: int=4,
+                 dropout=0.1,
+                 n_layers: int=1,
+                 n_ctx: int=1024,
+                 ):
+        super(GPTQ, self).__init__()
+        self.n_layers = n_layers
+        tblock = TransformerBlock(embed_dim, n_heads=n_heads, dropout=dropout)
+        self.h = ModuleList([copy.deepcopy(tblock) for i in range(self.n_layers)])
+        self.wte = nn.Embedding(vocab_size, embed_dim)
+        self.wpe = nn.Embedding(n_ctx, embed_dim)  # this is learned, not pre-computed
+        self.dropout = nn.Dropout(dropout)
+        self.ln_f    = LayerNorm(embed_dim)
+        self.out     = nn.Linear(embed_dim, vocab_size, bias=False)
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.init_weights()
+
+    def init_weights(self):
+        self.out.weight = self.wte.weight
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, (nn.Linear, nn.Embedding, Conv1D)):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if isinstance(module, (nn.Linear, Conv1D)) and module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+    
+    def forward(self, src, labels=None, pos_ids=None):
+        if pos_ids is None:
+            pos_ids = torch.arange(0, src.size(-1)).unsqueeze(0)
+        x = self.wte(src) + self.wpe(pos_ids)
+        x = self.dropout(x)
+        for i in range(self.nlayers): 
+            x = self.h[i](x)
+        x     = self.ln_f(x)
+        logits  = self.out(x)
+        outputs = (logits,) + (x,)
+
+        if labels is not None:
+            shift_logits = logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
+            loss = self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            outputs = (loss,) + outputs
+            return outputs
+        return logits
