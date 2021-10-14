@@ -54,11 +54,13 @@ class IMDbData(Dataset):
 
 
 class IMDbDataModule(LightningDataModule):
-    def __init__(self, val_split=0.2, batch_size=32, max_length=512, tokenizer="char-bpe"):
+    def __init__(self, val_split=0.2, batch_size=32, max_seq_length=512, tokenizer="char-bpe"):
         super(IMDbDataModule, self).__init__()
 
         self.val_split = val_split
         self.batch_size = batch_size
+        self.max_seq_length = max_seq_length
+
         if tokenizer == "wordpiece":
             self.tokenizer = BertWordPieceTokenizer("./gptq-vocab.txt")
         elif tokenizer == "byte-level-bpe":
@@ -74,7 +76,16 @@ class IMDbDataModule(LightningDataModule):
             ("</s>", self.tokenizer.token_to_id("</s>")),
             ("<s>", self.tokenizer.token_to_id("<s>")),
         )
-        self.tokenizer.enable_truncation(max_length=max_length)
+        self.tokenizer.enable_truncation(max_length=max_seq_length)
+
+    def _pad(self, x):
+        n = len(x)
+        if n >= self.max_seq_length:
+            return x
+        return x + [0] * (self.max_seq_length - n)
+
+    def _review_to_id(self, y):
+        return [1 if a == 'pos' else 0 for a in y]
 
     def tokenize(self, data_iter):
         X = []
@@ -82,7 +93,10 @@ class IMDbDataModule(LightningDataModule):
         for label, line in data_iter:
             X.append(line)
             y.append(label)
-        X = [x.ids for x in self.tokenizer.encode_batch(X)]
+        X = [self._pad(x.ids) for x in self.tokenizer.encode_batch(X)]
+        y = self._review_to_id(y)
+        #X = torch.Tensor(X)
+        #y = torch.Tensor(y)
         return [z for z in zip(X, y)]
 
     def prepare_data(self):

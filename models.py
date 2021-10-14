@@ -252,16 +252,20 @@ class IMDbClassifier(pl.LightningModule):
         return F.log_softmax(x, dim=1)
 
     def training_step(self, batch, batch_idx):
-        src_ids, tgt_ids = batch
-        logits = self(src_ids, tgt_ids)
-
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = tgt_ids[..., 1:].contiguous()
-        loss = F.nll_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        x, y = batch
+        x = torch.Tensor(x)
+        y = torch.Tensor(y)
+        logits = self(x)
+        loss = F.nll_loss(logits, y)
+        #shift_logits = logits[..., :-1, :].contiguous()
+        #shift_labels = tgt_ids[..., 1:].contiguous()
+        #loss = F.nll_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        x = torch.Tensor(x)
+        y = torch.Tensor(y)
         logits = self(x)
         loss = F.nll_loss(logits, y)
         preds = torch.argmax(logits, dim=1)
