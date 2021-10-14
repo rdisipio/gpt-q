@@ -1,7 +1,11 @@
 torch
 torch-vision
+torchtext
 pytorch-lightning
 pandas
 tdqm
 tokenizers
 pennylane
+matplotlib
+seaborn
+sklearn

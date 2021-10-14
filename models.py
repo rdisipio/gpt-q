@@ -1,14 +1,16 @@
 import math
 import copy
+
 import torch
-
-import pytorch_lightning as pl
-import pennylane as qml
-
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules import ModuleList
 from torch.nn.modules.normalization import LayerNorm
+
+import pytorch_lightning as pl
+from pytorch_lightning.metrics.functional import accuracy
+
+import pennylane as qml
 from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
 
@@ -191,8 +193,8 @@ class TransformerBlock(pl.LightningModule):
 class GPTQ(pl.LightningModule):
     def __init__(self,
                  embed_dim,
-                 vocab_size,
-                 output_dim,
+                 src_vocab,
+                 tgt_vocab,
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
@@ -202,27 +204,19 @@ class GPTQ(pl.LightningModule):
         self.n_layers = n_layers
         tblock = TransformerBlock(embed_dim, n_heads=n_heads, dropout=dropout)
         self.h = ModuleList([copy.deepcopy(tblock) for i in range(self.n_layers)])
-        self.wte = nn.Embedding(vocab_size, embed_dim)
+        self.wte = nn.Embedding(src_vocab, embed_dim)
         self.wpe = nn.Embedding(n_ctx, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(dropout)
         self.ln_f    = LayerNorm(embed_dim)
-        self.out     = nn.Linear(embed_dim, output_dim, bias=False)
+        self.out     = nn.Linear(embed_dim, tgt_vocab, bias=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.init_weights()
 
     def init_weights(self):
-        #self.out.weight = self.wte.weight
-        self.apply(self._init_weights)
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
-    def _init_weights(self, module):
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.data.normal_(mean=0.0, std=0.02)
-            if isinstance(module, (nn.Linear)) and module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.LayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-    
     def forward(self, src_ids, tgt_ids=None, pos_ids=None):
         if pos_ids is None:
             pos_ids = torch.arange(0, src_ids.size(-1)).unsqueeze(0)
@@ -245,3 +239,37 @@ class GPTQ(pl.LightningModule):
             outputs = (loss,) + outputs
             return outputs
         return logits
+
+
+class IMDbClassifier(pl.LightningModule):
+    def __init__(self, model, lr=1e-3):
+        super(IMDbClassifier, self).__init__()
+        self.lr = lr
+        self.model = model
+
+    def forward(self, x):
+        x, _ = self.model(x)
+        return F.log_softmax(x, dim=1)
+
+    def training_step(self, batch, batch_idx):
+        src_ids, tgt_ids = batch
+        logits = self(src_ids, tgt_ids)
+
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = tgt_ids[..., 1:].contiguous()
+        loss = F.nll_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(x)
+        loss = F.nll_loss(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
+        self.log("val_loss", loss, prog_bar=True)
+        self.log("val_acc", acc, prog_bar=True)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
