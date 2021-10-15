@@ -149,18 +149,18 @@ class MultiHeadAttention(pl.LightningModule):
 
     def forward(self, x):
         x = self.c_attn(x)
-        print("after qconv 1->3:", x.shape)
+        #print("after qconv 1->3:", x.shape)
         q, k, v = x[:, :, :,  0], x[:, :, :, 1], x[:, :, :, 2]
-        print("shapes: q:", q.shape, "k:", k.shape, "v:", v.shape)
+        #print("shapes: q:", q.shape, "k:", k.shape, "v:", v.shape)
         q, k, v  = self.split_heads(q), self.split_heads(k), self.split_heads(v)
-        print("after split heads:", q.shape, k.shape, v.shape)
+        #print("after split heads:", q.shape, k.shape, v.shape)
         out      = self._attn(q, k, v)
-        print("attention:", out.shape)
+        #print("attention:", out.shape)
         out      = self.merge_heads(out)
-        print("merged heads:", out.shape)
+        #print("merged heads:", out.shape)
         out      = self.c_proj(out)
         out = torch.squeeze(out, dim=-1)
-        print("attn output:", out.shape)
+        #print("attn output:", out.shape)
         return out
 
 
@@ -227,9 +227,9 @@ class GPTQ(pl.LightningModule):
         for i in range(self.n_layers): 
             x = self.h[i](x)
         x = self.ln_f(x)
-        print("output of transformer blocks:", x.shape)
+        #print("output of transformer blocks:", x.shape)
         logits = self.out(x)
-        print("logits:", logits.shape)
+        #print("logits:", logits.shape)
         outputs = (logits,) + (x,)
 
         if tgt_ids is not None:
@@ -248,15 +248,16 @@ class IMDbClassifier(pl.LightningModule):
         self.model = model
 
     def forward(self, x):
-        x, _ = self.model(x)
+        x = self.model(x)
         return F.log_softmax(x, dim=1)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
+        #x = torch.Tensor(x)
+        #y = torch.Tensor(y)
         logits = self(x)
-        loss = F.nll_loss(logits, y)
+        probs = F.log_softmax(logits)
+        loss = F.nll_loss(probs.transpose(1,2), y)
         #shift_logits = logits[..., :-1, :].contiguous()
         #shift_labels = tgt_ids[..., 1:].contiguous()
         #loss = F.nll_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
@@ -264,11 +265,12 @@ class IMDbClassifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
+        #x = torch.stack(x)
+        #y = torch.stack(y)
         logits = self(x)
-        loss = F.nll_loss(logits, y)
-        preds = torch.argmax(logits, dim=1)
+        probs = F.log_softmax(logits)
+        loss = F.nll_loss(probs.transpose(1,2), y)
+        preds = torch.argmax(probs, dim=1)
         acc = accuracy(preds, y)
         self.log("val_loss", loss, prog_bar=True)
         self.log("val_acc", acc, prog_bar=True)

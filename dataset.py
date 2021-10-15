@@ -71,12 +71,21 @@ class IMDbDataModule(LightningDataModule):
             self.tokenizer = CharBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
         else:
             raise RuntimeError(f"Uknown tokenizer {tokenizer}")
+        
+        self.special_tokens = [
+            "<s>",
+            "<pad>",
+            "</s>",
+            "<unk>",
+            "<mask>",
+        ]
 
         self.tokenizer._tokenizer.post_processor = BertProcessing(
             ("</s>", self.tokenizer.token_to_id("</s>")),
             ("<s>", self.tokenizer.token_to_id("<s>")),
         )
         self.tokenizer.enable_truncation(max_length=max_seq_length)
+        self.tokenizer.enable_padding(pad_id=1, pad_token="<pad>")
 
     def _pad(self, x):
         n = len(x)
@@ -95,6 +104,8 @@ class IMDbDataModule(LightningDataModule):
             y.append(label)
         X = [self._pad(x.ids) for x in self.tokenizer.encode_batch(X)]
         y = self._review_to_id(y)
+
+        X = [torch.LongTensor(x) for x in X]
         #X = torch.Tensor(X)
         #y = torch.Tensor(y)
         return [z for z in zip(X, y)]
@@ -113,9 +124,9 @@ class IMDbDataModule(LightningDataModule):
 
             self.imdb_train = Subset(self.train_data, train_idx)
             self.imdb_val = Subset(self.train_data, val_idx)
-        if stage == "test" or stage is None:
-            self.imdb_test = None
-    
+        #if stage == "test" or stage is None:
+        #    self.imdb_test = None
+
     def train_dataloader(self):
         return DataLoader(self.imdb_train, batch_size=self.batch_size)
 
