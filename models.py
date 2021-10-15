@@ -8,7 +8,7 @@ from torch.nn.modules import ModuleList
 from torch.nn.modules.normalization import LayerNorm
 
 import pytorch_lightning as pl
-from pytorch_lightning.metrics.functional import accuracy
+from torchmetrics.functional.classification.accuracy import accuracy
 
 import pennylane as qml
 from pennylane import numpy as np
