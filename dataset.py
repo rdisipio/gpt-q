@@ -6,71 +6,23 @@ from torch.utils.data import Dataset, DataLoader, Subset
 
 from sklearn.model_selection import train_test_split
 
-from tokenizers import ByteLevelBPETokenizer, BertWordPieceTokenizer, SentencePieceBPETokenizer, CharBPETokenizer
+from tokenizers import Tokenizer
+#ByteLevelBPETokenizer, BertWordPieceTokenizer, SentencePieceBPETokenizer, CharBPETokenizer
 from tokenizers.processors import BertProcessing
 
 from torchtext.datasets import IMDB
 from pytorch_lightning import LightningDataModule
 
 
-class IMDbData(Dataset):
-    def __init__(self,
-                 data_iter,
-                 max_length=512,
-                 tokenizer="char-bpe"
-                ):
-        super(IMDbData, self).__init__()
-
-        if tokenizer == "wordpiece":
-            self.tokenizer = BertWordPieceTokenizer("./gptq-vocab.txt")
-        elif tokenizer == "byte-level-bpe":
-            self.tokenizer = ByteLevelBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
-        elif tokenizer == "sentencepiece-bpe":
-            self.tokenizer = SentencePieceBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
-        elif tokenizer == "char-bpe":
-            self.tokenizer = CharBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
-        else:
-            raise RuntimeError(f"Uknown tokenizer {tokenizer}")
-
-        self.tokenizer._tokenizer.post_processor = BertProcessing(
-            ("</s>", tokenizer.token_to_id("</s>")),
-            ("<s>", tokenizer.token_to_id("<s>")),
-        )
-        self.tokenizer.enable_truncation(max_length=max_length)
-
-        self.examples = []
-        self.labels = []
-        for label, line in data_iter:
-            self.examples.append(line)
-            self.labels.append(label)
-        self.examples = [x.ids for x in self.tokenizer.encode_batch(self.examples)]
-
-        def __len__(self):
-            return len(self.examples)
-
-        def __getitem__(self, i):
-            token_ids = self.examples[i]
-            return torch.tensor(token_ids), torch.tensor([label])
-
-
 class IMDbDataModule(LightningDataModule):
-    def __init__(self, val_split=0.2, batch_size=32, max_seq_length=512, tokenizer="char-bpe"):
+    def __init__(self, val_split=0.2, batch_size=32, max_seq_length=512):
         super(IMDbDataModule, self).__init__()
 
         self.val_split = val_split
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
 
-        if tokenizer == "wordpiece":
-            self.tokenizer = BertWordPieceTokenizer("./gptq-vocab.txt")
-        elif tokenizer == "byte-level-bpe":
-            self.tokenizer = ByteLevelBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
-        elif tokenizer == "sentencepiece-bpe":
-            self.tokenizer = SentencePieceBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
-        elif tokenizer == "char-bpe":
-            self.tokenizer = CharBPETokenizer("./gptq-vocab.json", "./gptq-merges.txt")
-        else:
-            raise RuntimeError(f"Uknown tokenizer {tokenizer}")
+        self.tokenizer = Tokenizer.from_file("./gptq.json")
         
         self.special_tokens = [
             "<s>",
@@ -80,10 +32,10 @@ class IMDbDataModule(LightningDataModule):
             "<mask>",
         ]
 
-        self.tokenizer._tokenizer.post_processor = BertProcessing(
-            ("</s>", self.tokenizer.token_to_id("</s>")),
-            ("<s>", self.tokenizer.token_to_id("<s>")),
-        )
+        #self.tokenizer._tokenizer.post_processor = BertProcessing(
+        #    ("</s>", self.tokenizer.token_to_id("</s>")),
+        #    ("<s>", self.tokenizer.token_to_id("<s>")),
+        #)
         self.tokenizer.enable_truncation(max_length=max_seq_length)
         self.tokenizer.enable_padding(pad_id=1, pad_token="<pad>")
 
