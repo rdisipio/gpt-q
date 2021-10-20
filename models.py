@@ -329,8 +329,8 @@ class LanguageModel(GPTQ):
             n_layers=n_layers,
             max_seq_len=max_seq_len)
 
-    def forward(self, x):
-        x = self._step(src_ids=x)
+    def forward(self, x, mask=None):
+        x = self._step(x, mask=mask)
         logits = self.out(x)
         return logits
 
