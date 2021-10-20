@@ -3,6 +3,11 @@ import numpy as np
 
 from torch.autograd import Variable
 
+def make_src_mask(sz):
+  mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+  mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+  return mask
+
 
 def make_subsequent_mask(size):
     "Mask out subsequent positions."
@@ -12,7 +17,9 @@ def make_subsequent_mask(size):
 
 
 def make_padding_mask(src, pad=0):
-    mask = (src != pad).unsqueeze(-2)
+    src = torch.from_numpy(src)
+    mask = (src != pad)
+    mask = torch.unsqueeze(mask, -2)
     return mask
 
 

@@ -14,6 +14,8 @@ import pennylane as qml
 from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
 
+from utils import make_src_mask
+
 
 class QConv1d(pl.LightningModule):
     def __init__(self,
@@ -128,15 +130,18 @@ class MultiHeadAttention(pl.LightningModule):
         x = x.view(*new_shape)
         return x.permute(0, 2, 1, 3) 
 
-    def _attn(self, q, k, v, mask=None):
+    def _attn(self, q, k, v, attn_mask=None):
         scores = torch.matmul(q, k.transpose(-2, -1))
         sf = math.sqrt(v.size(-1))
         scores = scores / sf
         #nd, ns  = scores.size(-2), scores.size(-1)
-        if mask is not None:
-            mask = mask.unsqueeze(1)
-            #scores = scores.masked_fill(mask == 0, -1e9)
-            scores = scores.float().masked_fill(mask, -float('inf')).type_as(scores)
+        if attn_mask is not None:
+            # we add float('-inf') to tokens we want to suppress
+            # so the softmax prob is 0
+            attn_mask = attn_mask.unsqueeze(1)
+            scores += attn_mask
+            #scores = scores.masked_fill(attn_mask == 0, -1e9)
+            #scores = scores.float().masked_fill(attn_mask, -float('inf')).type_as(scores)
         scores  = self.softmax(scores)
         scores  = self.dropout(scores)
         outputs = torch.matmul(scores, v)
@@ -218,6 +223,9 @@ class GPTQ(pl.LightningModule):
                 nn.init.xavier_uniform_(p)
 
     def _step(self, token_ids, mask=None):
+        if mask is None:
+            seq_len = token_ids.size(1)
+            mask = make_src_mask(seq_len)
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
         x_tokens = self.wte(token_ids)
         x_pos = self.wpe(pos_ids)
