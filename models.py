@@ -253,14 +253,13 @@ class GPTQ(pl.LightningModule):
 class IMDbClassifier(GPTQ):
     def __init__(self,
                  embed_dim,
-                 n_classes=2,
                  vocab_size: int=2000,
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
                  n_ctx: int=1024,
                  lr=1e-3):
-        self.n_classes = n_classes
+        self.n_classes = 2
         self.lr = lr
         super(IMDbClassifier, self).__init__(
             embed_dim=embed_dim,

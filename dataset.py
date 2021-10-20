@@ -15,12 +15,13 @@ from pytorch_lightning import LightningDataModule
 
 
 class IMDbDataModule(LightningDataModule):
-    def __init__(self, val_split=0.2, batch_size=32, max_seq_length=512):
+    def __init__(self, val_split=0.2, batch_size=32, max_seq_length=512, n_examples_max=None):
         super(IMDbDataModule, self).__init__()
 
         self.val_split = val_split
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
+        self.n_examples_max = n_examples_max
 
         self.tokenizer = Tokenizer.from_file("./gptq.json")
         
@@ -52,6 +53,8 @@ class IMDbDataModule(LightningDataModule):
         X = []
         y = []
         for label, line in data_iter:
+            if self.n_examples_max is not None and len(X) > self.n_examples_max:
+                break
             X.append(line)
             y.append(label)
         X = [self._pad(x.ids) for x in self.tokenizer.encode_batch(X)]
