@@ -147,14 +147,14 @@ class MultiHeadAttention(pl.LightningModule):
         new_shape = x.size()[:-2] + (x.size(-2) * x.size(-1),)
         return x.view(*new_shape)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         x = self.c_attn(x)
         #print("after qconv 1->3:", x.shape)
         q, k, v = x[:, :, :,  0], x[:, :, :, 1], x[:, :, :, 2]
         #print("shapes: q:", q.shape, "k:", k.shape, "v:", v.shape)
         q, k, v  = self.split_heads(q), self.split_heads(k), self.split_heads(v)
         #print("after split heads:", q.shape, k.shape, v.shape)
-        out      = self._attn(q, k, v)
+        out      = self._attn(q, k, v, mask)
         #print("attention:", out.shape)
         out      = self.merge_heads(out)
         #print("merged heads:", out.shape)
@@ -184,7 +184,7 @@ class TransformerBlock(pl.LightningModule):
         self.ln_1 = LayerNorm(embed_dim)
         self.ln_2 = LayerNorm(embed_dim)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         x = x + self.attn(self.ln_1(x))
         x = x + self.feedforward(self.ln_2(x))
         return x
@@ -217,20 +217,21 @@ class GPTQ(pl.LightningModule):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def _step(self, src_ids, pos_ids=None):
-        if pos_ids is None:
-            pos_ids = torch.arange(0, src_ids.size(-1)).unsqueeze(0)
-        x_tokens = self.wte(src_ids)
+    def _step(self, token_ids, mask=None):
+        pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
+        x_tokens = self.wte(token_ids)
         x_pos = self.wpe(pos_ids)
         x = x_tokens + x_pos
         x = self.dropout(x)
         for i in range(self.n_layers): 
-            x = self.h[i](x)
+            x = self.h[i](x, mask)
         x = self.ln_f(x)
         return x
 
-    def forward(self, src_ids, tgt_ids=None, pos_ids=None):
-        raise NotImplementedError("Base class GPTQ does not implement forward method")
+    def forward(self, token_ids, mask=None):
+        x = self._step(token_ids, mask)
+        logits = self.out(x)
+        return logits
         '''
         x = self._step1(src_ids, pos_ids)
         x = x.mean(dim=1)
@@ -250,15 +251,16 @@ class GPTQ(pl.LightningModule):
 
 
 class IMDbClassifier(GPTQ):
-    def __init__(self, 
+    def __init__(self,
                  embed_dim,
+                 n_classes=2,
                  vocab_size: int=2000,
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
                  n_ctx: int=1024,
                  lr=1e-3):
-        self.n_classes = 2
+        self.n_classes = n_classes
         self.lr = lr
         super(IMDbClassifier, self).__init__(
             embed_dim=embed_dim,
@@ -269,9 +271,9 @@ class IMDbClassifier(GPTQ):
             n_layers=n_layers,
             n_ctx=n_ctx)
 
-    def forward(self, x):
-        x = self._step(src_ids=x)
-        x = x.mean(dim=1)
+    def forward(self, token_ids, mask=None):
+        x = self._step(token_ids, mask)
+        x = x.mean(dim=1)  # average across tokens for each embedding dim
         logits = self.out(x)
         return logits
 
