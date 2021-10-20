@@ -61,8 +61,6 @@ class IMDbDataModule(LightningDataModule):
         y = self._review_to_id(y)
 
         X = [torch.LongTensor(x) for x in X]
-        #X = torch.Tensor(X)
-        #y = torch.Tensor(y)
         return [z for z in zip(X, y)]
 
     def prepare_data(self):
