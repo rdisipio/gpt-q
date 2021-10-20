@@ -15,13 +15,19 @@ from pytorch_lightning import LightningDataModule
 
 
 class IMDbDataModule(LightningDataModule):
-    def __init__(self, val_split=0.2, batch_size=32, max_seq_length=512, n_examples_max=None):
+    def __init__(self,
+                 val_split=0.2,
+                 batch_size=32,
+                 max_seq_length=512,
+                 n_examples_max=None,
+                 num_workers=2):
         super(IMDbDataModule, self).__init__()
 
         self.val_split = val_split
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self.n_examples_max = n_examples_max
+        self.num_workers = num_workers
 
         self.tokenizer = Tokenizer.from_file("./gptq.json")
         
@@ -81,10 +87,10 @@ class IMDbDataModule(LightningDataModule):
         #    self.imdb_test = None
 
     def train_dataloader(self):
-        return DataLoader(self.imdb_train, batch_size=self.batch_size)
+        return DataLoader(self.imdb_train, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.imdb_val, batch_size=self.batch_size)
+        return DataLoader(self.imdb_val, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.imdb_test, batch_size=self.batch_size)
+        return DataLoader(self.imdb_test, batch_size=self.batch_size, num_workers=self.num_workers)

@@ -138,7 +138,7 @@ class MultiHeadAttention(pl.LightningModule):
         if attn_mask is not None:
             # we add float('-inf') to tokens we want to suppress
             # so the softmax prob is 0
-            attn_mask = attn_mask.unsqueeze(1)
+            attn_mask = attn_mask.unsqueeze(0)
             scores += attn_mask
             #scores = scores.masked_fill(attn_mask == 0, -1e9)
             #scores = scores.float().masked_fill(attn_mask, -float('inf')).type_as(scores)
@@ -190,7 +190,7 @@ class TransformerBlock(pl.LightningModule):
         self.ln_2 = LayerNorm(embed_dim)
 
     def forward(self, x, mask=None):
-        x = x + self.attn(self.ln_1(x))
+        x = x + self.attn(self.ln_1(x), mask)
         x = x + self.feedforward(self.ln_2(x))
         return x
 
