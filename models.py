@@ -208,7 +208,7 @@ class GPTQ(pl.LightningModule):
         self.wpe = nn.Embedding(n_ctx, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(dropout)
         self.ln_f    = LayerNorm(embed_dim)
-        self.out     = nn.Linear(embed_dim, tgt_vocab, bias=False)
+        self.out     = nn.Linear(embed_dim, tgt_vocab, bias=False)  #QCNN, VQC?
         self.loss_fn = nn.CrossEntropyLoss()
         self.init_weights()
 
@@ -217,7 +217,7 @@ class GPTQ(pl.LightningModule):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src_ids, tgt_ids=None, pos_ids=None):
+    def _step(self, src_ids, pos_ids=None):
         if pos_ids is None:
             pos_ids = torch.arange(0, src_ids.size(-1)).unsqueeze(0)
         x_tokens = self.wte(src_ids)
@@ -226,8 +226,14 @@ class GPTQ(pl.LightningModule):
         x = self.dropout(x)
         for i in range(self.n_layers): 
             x = self.h[i](x)
-        x = x.mean(dim=1)
         x = self.ln_f(x)
+        return x
+
+    def forward(self, src_ids, tgt_ids=None, pos_ids=None):
+        raise NotImplementedError("Base class GPTQ does not implement forward method")
+        '''
+        x = self._step1(src_ids, pos_ids)
+        x = x.mean(dim=1)
         #print("output of transformer blocks:", x.shape)
         logits = self.out(x)
         #print("logits:", logits.shape)
@@ -240,22 +246,37 @@ class GPTQ(pl.LightningModule):
             outputs = (loss,) + outputs
             return outputs
         return logits
+        '''
 
 
-class IMDbClassifier(pl.LightningModule):
-    def __init__(self, model, lr=1e-3):
-        super(IMDbClassifier, self).__init__()
+class IMDbClassifier(GPTQ):
+    def __init__(self, 
+                 embed_dim,
+                 vocab_size: int=2000,
+                 n_heads: int=4,
+                 dropout=0.1,
+                 n_layers: int=1,
+                 n_ctx: int=1024,
+                 lr=1e-3):
+        self.n_classes = 2
         self.lr = lr
-        self.model = model
+        super(IMDbClassifier, self).__init__(
+            embed_dim=embed_dim,
+            src_vocab=vocab_size,
+            tgt_vocab=self.n_classes,
+            n_heads=n_heads,
+            dropout=dropout,
+            n_layers=n_layers,
+            n_ctx=n_ctx)
 
     def forward(self, x):
-        x = self.model(x)
-        return F.log_softmax(x, dim=1)
+        x = self._step(src_ids=x)
+        x = x.mean(dim=1)
+        logits = self.out(x)
+        return logits
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        #x = torch.Tensor(x)
-        #y = torch.Tensor(y)
         logits = self(x)
         probs = F.log_softmax(logits, dim=-1)
         loss = F.nll_loss(probs, y)
@@ -266,8 +287,56 @@ class IMDbClassifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        #x = torch.stack(x)
-        #y = torch.stack(y)
+        logits = self(x)
+        probs = F.log_softmax(logits, dim=-1)
+        loss = F.nll_loss(probs, y)
+        preds = torch.argmax(probs, dim=-1)
+        acc = accuracy(preds, y)
+        self.log("val_loss", loss, prog_bar=True)
+        self.log("val_acc", acc, prog_bar=True)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
+
+
+class LanguageModel(GPTQ):
+    def __init__(self, 
+                 embed_dim,
+                 vocab_size: int=2000,
+                 n_heads: int=4,
+                 dropout=0.1,
+                 n_layers: int=1,
+                 n_ctx: int=1024,
+                 lr=1e-3):
+        self.lr = lr
+        super(LanguageModel, self).__init__(
+            embed_dim=embed_dim,
+            src_vocab=vocab_size,
+            tgt_vocab=vocab_size,
+            n_heads=n_heads,
+            dropout=dropout,
+            n_layers=n_layers,
+            n_ctx=n_ctx)
+
+    def forward(self, x):
+        x = self._step(src_ids=x)
+        logits = self.out(x)
+        return logits
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(x)
+        probs = F.log_softmax(logits, dim=-1)
+        loss = F.nll_loss(probs, y)
+        #shift_logits = logits[..., :-1, :].contiguous()
+        #shift_labels = tgt_ids[..., 1:].contiguous()
+        #loss = F.nll_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
         logits = self(x)
         probs = F.log_softmax(logits, dim=-1)
         loss = F.nll_loss(probs, y)
