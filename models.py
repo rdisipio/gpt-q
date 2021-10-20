@@ -203,19 +203,20 @@ class GPTQ(pl.LightningModule):
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
-                 n_ctx: int=1024,
+                 max_seq_len: int=1024,
                  ):
         super(GPTQ, self).__init__()
         self.n_layers = n_layers
         tblock = TransformerBlock(embed_dim, n_heads=n_heads, dropout=dropout)
         self.h = ModuleList([copy.deepcopy(tblock) for i in range(self.n_layers)])
         self.wte = nn.Embedding(src_vocab, embed_dim)
-        self.wpe = nn.Embedding(n_ctx, embed_dim)  # this is learned, not pre-computed
+        self.wpe = nn.Embedding(max_seq_len, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(dropout)
         self.ln_f    = LayerNorm(embed_dim)
         self.out     = nn.Linear(embed_dim, tgt_vocab, bias=False)  #QCNN, VQC?
         self.loss_fn = nn.CrossEntropyLoss()
         self.init_weights()
+        self.attn_mask = make_src_mask(max_seq_len)
 
     def init_weights(self):
         for p in self.parameters():
@@ -224,8 +225,7 @@ class GPTQ(pl.LightningModule):
 
     def _step(self, token_ids, mask=None):
         if mask is None:
-            seq_len = token_ids.size(1)
-            mask = make_src_mask(seq_len)
+            mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
         x_tokens = self.wte(token_ids)
         x_pos = self.wpe(pos_ids)
@@ -265,7 +265,7 @@ class IMDbClassifier(GPTQ):
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
-                 n_ctx: int=1024,
+                 max_seq_len: int=1024,
                  lr=1e-3):
         self.n_classes = 2
         self.lr = lr
@@ -276,7 +276,7 @@ class IMDbClassifier(GPTQ):
             n_heads=n_heads,
             dropout=dropout,
             n_layers=n_layers,
-            n_ctx=n_ctx)
+            max_seq_len=max_seq_len)
 
     def forward(self, token_ids, mask=None):
         x = self._step(token_ids, mask)
@@ -317,7 +317,7 @@ class LanguageModel(GPTQ):
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
-                 n_ctx: int=1024,
+                 max_seq_len: int=1024,
                  lr=1e-3):
         self.lr = lr
         super(LanguageModel, self).__init__(
@@ -327,7 +327,7 @@ class LanguageModel(GPTQ):
             n_heads=n_heads,
             dropout=dropout,
             n_layers=n_layers,
-            n_ctx=n_ctx)
+            max_seq_len=max_seq_len)
 
     def forward(self, x):
         x = self._step(src_ids=x)
