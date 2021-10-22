@@ -84,15 +84,25 @@ class FeedForward(pl.LightningModule):
                  boom_factor=4,
                  dropout=0.1,
                  n_qubits: int=5,
-                 n_qlayers: int=1):
+                 n_qlayers: int=1,
+                 q_device: str="default.qubit"
+                 ):
         super(FeedForward, self).__init__()
         assert n_qubits % 2 == 1, "Kernel size must be odd to conserve embedding dimension"
         padding = (n_qubits - 1) // 2
 
-        self.c_fc = QConv1d(kernel_size=n_qubits, out_channels=boom_factor, padding=padding, n_qlayers=n_qlayers)
+        self.c_fc = QConv1d(kernel_size=n_qubits,
+                            out_channels=boom_factor,
+                            padding=padding,
+                            n_qlayers=n_qlayers,
+                            q_device=q_device)
 
         s_inv = (boom_factor * embed_dim - boom_factor) // (embed_dim - 1)
-        self.c_proj = QConv1d(kernel_size=boom_factor, out_channels=1, stride=s_inv)
+        self.c_proj = QConv1d(kernel_size=boom_factor,
+                              out_channels=1,
+                              stride=s_inv,
+                              n_qlayers=n_qlayers,
+                              q_device=q_device)
         self.activation = F.gelu
         self.dropout = nn.Dropout(dropout)
  
@@ -118,6 +128,7 @@ class MultiHeadAttention(pl.LightningModule):
                  n_heads: int=2,
                  n_qubits: int=5,
                  n_qlayers: int=1,
+                 q_device: str="default.qubit",
                  ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
@@ -126,7 +137,8 @@ class MultiHeadAttention(pl.LightningModule):
         self.c_attn = QConv1d(kernel_size=n_qubits,
                               out_channels=3,
                               n_qlayers=n_qlayers,
-                              padding=padding)
+                              padding=padding,
+                              q_device=q_device)
         self.softmax = nn.Softmax(dim=-1)
         #self.register_buffer("bias", torch.tril(torch.ones(n_ctx, n_ctx)).view(1, 1, n_ctx, n_ctx))
         self.dropout = nn.Dropout(0.1)
@@ -184,17 +196,20 @@ class TransformerBlock(pl.LightningModule):
                  n_heads: int=2,
                  n_qubits: int=5,
                  n_qlayers: int=1,
+                 q_device: str="default.qubit",
                  dropout=0.1):
         super(TransformerBlock, self).__init__()
         self.attn = MultiHeadAttention(embed_dim,
                               n_heads=n_heads,
                               n_qubits=n_qubits,
-                              n_qlayers=n_qlayers)
+                              n_qlayers=n_qlayers,
+                              q_device=q_device)
         self.feedforward = FeedForward(embed_dim,
                                        boom_factor=4,
                                        dropout=dropout,
                                        n_qubits=n_qubits,
-                                       n_qlayers=n_qlayers)
+                                       n_qlayers=n_qlayers,
+                                       q_device=q_device)
         self.ln_1 = LayerNorm(embed_dim)
         self.ln_2 = LayerNorm(embed_dim)
 
@@ -211,13 +226,29 @@ class GPTQ(pl.LightningModule):
                  tgt_vocab,
                  n_heads: int=4,
                  dropout=0.1,
-                 n_layers: int=1,
+                 n_tlayers: int=1,
                  max_seq_len: int=1024,
+                 n_qlayers: int=1,
+                 q_device: str="default.qubit",
                  ):
         super(GPTQ, self).__init__()
-        self.n_layers = n_layers
-        tblock = TransformerBlock(embed_dim, n_heads=n_heads, dropout=dropout)
+        self.n_tlayers = n_tlayers
+        '''
+        tblock = TransformerBlock(embed_dim,
+                                  n_heads=n_heads,
+                                  dropout=dropout,
+                                  n_qlayers=n_qlayers,
+                                  q_device=q_device)
         self.h = ModuleList([copy.deepcopy(tblock) for i in range(self.n_layers)])
+        '''
+        self.h = ModuleList([
+            TransformerBlock(embed_dim,
+                             n_heads=n_heads,
+                             dropout=dropout,
+                             n_qlayers=n_qlayers,
+                             q_device=q_device) for _ in range(self.n_tlayers)
+        ])
+
         self.wte = nn.Embedding(src_vocab, embed_dim)
         self.wpe = nn.Embedding(max_seq_len, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(dropout)
@@ -240,7 +271,7 @@ class GPTQ(pl.LightningModule):
         x_pos = self.wpe(pos_ids)
         x = x_tokens + x_pos
         x = self.dropout(x)
-        for i in range(self.n_layers): 
+        for i in range(self.n_tlayers): 
             x = self.h[i](x, mask)
         x = self.ln_f(x)
         return x
@@ -272,9 +303,11 @@ class IMDbClassifier(GPTQ):
                  embed_dim,
                  vocab_size: int=2000,
                  n_heads: int=4,
-                 dropout=0.1,
-                 n_layers: int=1,
+                 dropout: float=0.1,
+                 n_tlayers: int=1,
                  max_seq_len: int=1024,
+                 n_qlayers: int=1,
+                 q_device: str="default.qubit",
                  lr=1e-3):
         self.n_classes = 2
         self.lr = lr
@@ -284,8 +317,10 @@ class IMDbClassifier(GPTQ):
             tgt_vocab=self.n_classes,
             n_heads=n_heads,
             dropout=dropout,
-            n_layers=n_layers,
-            max_seq_len=max_seq_len)
+            n_tlayers=n_tlayers,
+            max_seq_len=max_seq_len,
+            n_qlayers=n_qlayers,
+            q_device=q_device)
 
     def forward(self, token_ids, mask=None):
         x = self._step(token_ids, mask)
