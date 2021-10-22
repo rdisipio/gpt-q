@@ -51,7 +51,7 @@ class QConv1d(pl.LightningModule):
         self.qconv.zero_grad()
 
     def forward(self, x):
-        batch_size, seq_len, embed_dim = x.shape
+        embed_dim = x.shape[-1]
         x = F.pad(x, (self.padding, self.padding), "constant", 0)
         out_dim = int((embed_dim + 2 * self.padding - self.kernel_size) / self.stride) + 1
 
