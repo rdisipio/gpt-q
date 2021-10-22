@@ -55,7 +55,7 @@ class QConv1d(pl.LightningModule):
         x = F.pad(x, (self.padding, self.padding), "constant", 0)
         out_dim = int((embed_dim + 2 * self.padding - self.kernel_size) / self.stride) + 1
 
-        idx = np.expand_dims(np.arange(self.kernel_size), 0) + np.expand_dims(np.arange(out_dim), 0).T
+        idx = torch.unsqueeze(torch.arange(self.kernel_size), 0) + torch.unsqueeze(torch.arange(out_dim), 0).T
         x = x[:, :, idx]
         return self.qconv(x)
         '''
