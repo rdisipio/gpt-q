@@ -54,6 +54,11 @@ class QConv1d(pl.LightningModule):
         batch_size, seq_len, embed_dim = x.shape
         x = F.pad(x, (self.padding, self.padding), "constant", 0)
         out_dim = int((embed_dim + 2 * self.padding - self.kernel_size) / self.stride) + 1
+
+        idx = np.expand_dims(np.arange(self.kernel_size), 0) + np.expand_dims(np.arange(out_dim), 0).T
+        x = x[:, :, idx]
+        return self.qconv(x)
+        '''
         output = torch.zeros((batch_size, seq_len, out_dim, self.out_channels))
         for i in range(batch_size):
             for j in range(seq_len):
@@ -65,6 +70,7 @@ class QConv1d(pl.LightningModule):
                     for c in range(self.out_channels):
                         output[i, j, k, c] = q_result[c]
         return output
+        '''
 
 
 class FeedForward(pl.LightningModule):
