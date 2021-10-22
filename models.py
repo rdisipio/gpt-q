@@ -57,9 +57,10 @@ class QConv1d(pl.LightningModule):
         output = torch.zeros((batch_size, seq_len, out_dim, self.out_channels))
         for i in range(batch_size):
             for j in range(seq_len):
-                for k in range(0, out_dim, self.stride):
-                    k_end = k + self.kernel_size
-                    x_slice  = x[i, j, k:k_end]
+                for k in range(0, out_dim):
+                    k_start = k*self.stride
+                    k_end = k_start + self.kernel_size
+                    x_slice  = x[i, j, k_start:k_end]
                     q_result = self.qconv(x_slice)
                     for c in range(self.out_channels):
                         output[i, j, k, c] = q_result[c]
