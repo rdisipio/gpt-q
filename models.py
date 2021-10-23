@@ -56,7 +56,7 @@ class QConv1d(pl.LightningModule):
         out_dim = int((embed_dim + 2 * self.padding - self.kernel_size) / self.stride) + 1
 
         # the code below creates indices for a sliding window of size kernel_size 
-        idx = torch.unsqueeze(torch.arange(self.kernel_size), 0) + torch.unsqueeze(torch.arange(out_dim), 0).T
+        idx = torch.unsqueeze(torch.arange(self.kernel_size), 0) + torch.unsqueeze(torch.arange(out_dim) * self.stride, 0).T
         x = x[:, :, idx]
         return self.qconv(x)
         '''
