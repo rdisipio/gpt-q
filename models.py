@@ -225,6 +225,9 @@ class TransformerBlockQuantum(pl.LightningModule):
 
 
 class GPTBase(pl.LightningModule):
+    '''
+    If you don't like C++ multiple inheritance, try Python
+    '''
     def __init__(self,
                  embed_dim,
                  src_vocab,
@@ -294,12 +297,6 @@ class GPT2(GPTBase):
             nn.TransformerEncoder(encoder_template, self.n_tlayers) for _ in range(self.n_tlayers)
         ])
 
-    '''
-    def forward(self, token_ids, src_mask=None):
-        x = GPTBase.forward(self, token_ids, src_mask)
-        logits = self.out(x)
-        return logits
-    '''
 
 class GPTQ(GPTBase):
     def __init__(self,
@@ -331,12 +328,6 @@ class GPTQ(GPTBase):
                                     q_device=self.q_device) for _ in range(self.n_tlayers)
         ])
 
-    '''
-    def forward(self, token_ids, src_mask=None):
-        x = GPTBase.forward(self, token_ids, src_mask)
-        logits = self.out(x)
-        return logits
-    '''
 
 class IMDbClassifierBase(pl.LightningModule):
     def __init__(self, lr=1e-3, **kwargs):
