@@ -233,14 +233,6 @@ class GPTQ(pl.LightningModule):
                  ):
         super(GPTQ, self).__init__()
         self.n_tlayers = n_tlayers
-        '''
-        tblock = TransformerBlock(embed_dim,
-                                  n_heads=n_heads,
-                                  dropout=dropout,
-                                  n_qlayers=n_qlayers,
-                                  q_device=q_device)
-        self.h = ModuleList([copy.deepcopy(tblock) for i in range(self.n_layers)])
-        '''
         self.h = ModuleList([
             TransformerBlock(embed_dim,
                              n_heads=n_heads,
