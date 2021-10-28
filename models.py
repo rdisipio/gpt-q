@@ -2,7 +2,7 @@ import math
 import copy
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 from torch.nn import functional as F
 from torch.nn.modules import ModuleList
 from torch.nn.modules.normalization import LayerNorm
@@ -163,8 +163,6 @@ class MultiHeadAttentionQuantum(pl.LightningModule):
             # so the softmax prob is 0
             attn_mask = attn_mask.unsqueeze(0)
             scores += attn_mask
-            #scores = scores.masked_fill(attn_mask == 0, -1e9)
-            #scores = scores.float().masked_fill(attn_mask, -float('inf')).type_as(scores)
         scores  = self.softmax(scores)
         scores  = self.dropout(scores)
         outputs = torch.matmul(scores, v)
@@ -177,18 +175,12 @@ class MultiHeadAttentionQuantum(pl.LightningModule):
 
     def forward(self, x, mask=None):
         x = self.c_attn(x)
-        #print("after qconv 1->3:", x.shape)
         q, k, v = x[:, :, :,  0], x[:, :, :, 1], x[:, :, :, 2]
-        #print("shapes: q:", q.shape, "k:", k.shape, "v:", v.shape)
-        q, k, v  = self.split_heads(q), self.split_heads(k), self.split_heads(v)
-        #print("after split heads:", q.shape, k.shape, v.shape)
-        out      = self._attn(q, k, v, mask)
-        #print("attention:", out.shape)
-        out      = self.merge_heads(out)
-        #print("merged heads:", out.shape)
-        out      = self.c_proj(out)
+        q, k, v = self.split_heads(q), self.split_heads(k), self.split_heads(v)
+        out = self._attn(q, k, v, mask)
+        out = self.merge_heads(out)
+        out = self.c_proj(out)
         out = torch.squeeze(out, dim=-1)
-        #print("attn output:", out.shape)
         return out
 
 
@@ -227,9 +219,9 @@ class GPTBase(pl.LightningModule):
     If you don't like C++ multiple inheritance, try Python
     '''
     def __init__(self,
-                 embed_dim,
-                 src_vocab,
-                 tgt_vocab,
+                 embed_dim: int,
+                 src_vocab: int,
+                 tgt_vocab: int,
                  n_heads: int=4,
                  dropout_rate=0.1,
                  n_tlayers: int=1,
@@ -248,8 +240,12 @@ class GPTBase(pl.LightningModule):
         self.wpe = nn.Embedding(max_seq_len, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(self.dropout_rate)
         self.ln_f    = LayerNorm(embed_dim)
-        self.attn_mask = nn.Transformer().generate_square_subsequent_mask(max_seq_len)
+        self.attn_mask = self.generate_square_subsequent_mask(max_seq_len)
         self.init_weights()
+
+    @staticmethod
+    def generate_square_subsequent_mask(sz: int) -> Tensor:
+        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1)
 
     def _create_tranformer_layers(self):
         raise NotImplementedError("GPT base class cannot create transformer layers")
