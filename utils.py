@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 
-from torch.autograd import Variable
 
 def make_src_mask(sz):
   mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)

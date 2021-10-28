@@ -14,8 +14,6 @@ import pennylane as qml
 from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
 
-from utils import make_src_mask
-
 
 class QConv1d(pl.LightningModule):
     '''
@@ -250,7 +248,7 @@ class GPTBase(pl.LightningModule):
         self.wpe = nn.Embedding(max_seq_len, embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(self.dropout_rate)
         self.ln_f    = LayerNorm(embed_dim)
-        self.attn_mask = make_src_mask(max_seq_len)
+        self.attn_mask = nn.Transformer().generate_square_subsequent_mask(max_seq_len)
         self.init_weights()
 
     def _create_tranformer_layers(self):
