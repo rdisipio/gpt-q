@@ -18,6 +18,9 @@ from utils import make_src_mask
 
 
 class QConv1d(pl.LightningModule):
+    '''
+    out_sz = (input_sz + 2*padding - kernel_sz) / stride + 1
+    '''
     def __init__(self,
                  kernel_size,
                  out_channels=3,  # ie Query, Key, Value
@@ -25,7 +28,7 @@ class QConv1d(pl.LightningModule):
                  q_device='default.qubit',
                  stride=1,
                  padding=0):
-        super(QConv1d, self).__init__()
+        super().__init__()
         self.out_channels = out_channels
         self.padding = padding
         self.stride = stride
@@ -75,19 +78,19 @@ class QConv1d(pl.LightningModule):
         '''
 
 
-class FeedForward(pl.LightningModule):
+class FeedForwardQuantum(pl.LightningModule):
     '''
     Used to create contextualized embeddings from the attention heads
     '''
     def __init__(self,
                  embed_dim,
                  boom_factor=4,
-                 dropout=0.1,
+                 dropout_rate=0.1,
                  n_qubits: int=5,
                  n_qlayers: int=1,
                  q_device: str="default.qubit"
                  ):
-        super(FeedForward, self).__init__()
+        super().__init__()
         assert n_qubits % 2 == 1, "Kernel size must be odd to conserve embedding dimension"
         padding = (n_qubits - 1) // 2
 
@@ -104,7 +107,7 @@ class FeedForward(pl.LightningModule):
                               n_qlayers=n_qlayers,
                               q_device=q_device)
         self.activation = F.gelu
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(dropout_rate)
  
     def _scatter_and_merge(self, x):
         batch_sz, seq_len, embed_dim, n_ch = x.shape
@@ -122,7 +125,7 @@ class FeedForward(pl.LightningModule):
         return torch.squeeze(x, dim=-1)
 
 
-class MultiHeadAttention(pl.LightningModule):
+class MultiHeadAttentionQuantum(pl.LightningModule):
     def __init__(self,
                  embed_dim: int=8,
                  n_heads: int=2,
@@ -130,7 +133,7 @@ class MultiHeadAttention(pl.LightningModule):
                  n_qlayers: int=1,
                  q_device: str="default.qubit",
                  ):
-        super(MultiHeadAttention, self).__init__()
+        super().__init__()
         self.embed_dim = embed_dim
         self.n_heads = n_heads
         padding = (n_qubits - 1) // 2  # does not change embed_dim
@@ -190,104 +193,145 @@ class MultiHeadAttention(pl.LightningModule):
         return out
 
 
-class TransformerBlock(pl.LightningModule):
+class TransformerBlockQuantum(pl.LightningModule):
     def __init__(self,
                  embed_dim,
                  n_heads: int=2,
                  n_qubits: int=5,
                  n_qlayers: int=1,
                  q_device: str="default.qubit",
-                 dropout=0.1):
-        super(TransformerBlock, self).__init__()
-        self.attn = MultiHeadAttention(embed_dim,
+                 dropout_rate=0.1):
+        super().__init__()
+        self.attn = MultiHeadAttentionQuantum(embed_dim,
                               n_heads=n_heads,
                               n_qubits=n_qubits,
                               n_qlayers=n_qlayers,
                               q_device=q_device)
-        self.feedforward = FeedForward(embed_dim,
+        self.feedforward = FeedForwardQuantum(embed_dim,
                                        boom_factor=4,
-                                       dropout=dropout,
+                                       dropout_rate=dropout_rate,
                                        n_qubits=n_qubits,
                                        n_qlayers=n_qlayers,
                                        q_device=q_device)
         self.ln_1 = LayerNorm(embed_dim)
         self.ln_2 = LayerNorm(embed_dim)
 
-    def forward(self, x, mask=None):
-        x = x + self.attn(self.ln_1(x), mask)
+    def forward(self, x, src_mask=None):
+        x = x + self.attn(self.ln_1(x), src_mask)
         x = x + self.feedforward(self.ln_2(x))
         return x
 
 
-class GPTQ(pl.LightningModule):
+class GPTBase(pl.LightningModule):
     def __init__(self,
                  embed_dim,
                  src_vocab,
                  tgt_vocab,
                  n_heads: int=4,
-                 dropout=0.1,
+                 dropout_rate=0.1,
                  n_tlayers: int=1,
                  max_seq_len: int=1024,
-                 n_qlayers: int=1,
-                 q_device: str="default.qubit",
                  ):
-        super(GPTQ, self).__init__()
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
+        self.n_heads = n_heads
+        self.dropout_rate = dropout_rate
         self.n_tlayers = n_tlayers
-        self.h = ModuleList([
-            TransformerBlock(embed_dim,
-                             n_heads=n_heads,
-                             dropout=dropout,
-                             n_qlayers=n_qlayers,
-                             q_device=q_device) for _ in range(self.n_tlayers)
-        ])
-
+        self.max_seq_len = max_seq_len
+        self.h = None
         self.wte = nn.Embedding(src_vocab, embed_dim)
         self.wpe = nn.Embedding(max_seq_len, embed_dim)  # this is learned, not pre-computed
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(self.dropout_rate)
         self.ln_f    = LayerNorm(embed_dim)
-        self.out     = nn.Linear(embed_dim, tgt_vocab, bias=False)  #QCNN, VQC?
-        self.loss_fn = nn.CrossEntropyLoss()
-        self.init_weights()
         self.attn_mask = make_src_mask(max_seq_len)
+        self.init_weights()
+
+    def _create_tranformer_layers(self):
+        raise NotImplementedError("GPT base class cannot create transformer layers")
 
     def init_weights(self):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def _step(self, token_ids, mask=None):
-        if mask is None:
-            mask = self.attn_mask
+    def forward(self, token_ids, src_mask=None):
+        if src_mask is None:
+            src_mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
         x_tokens = self.wte(token_ids)
         x_pos = self.wpe(pos_ids)
         x = x_tokens + x_pos
         x = self.dropout(x)
         for i in range(self.n_tlayers): 
-            x = self.h[i](x, mask)
+            x = self.h[i](x, src_mask)
         x = self.ln_f(x)
         return x
 
-    def forward(self, token_ids, mask=None):
-        x = self._step(token_ids, mask)
-        logits = self.out(x)
-        return logits
-        '''
-        x = self._step1(src_ids, pos_ids)
-        x = x.mean(dim=1)
-        #print("output of transformer blocks:", x.shape)
-        logits = self.out(x)
-        #print("logits:", logits.shape)
-        outputs = (logits,) + (x,)
 
-        if tgt_ids is not None:
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = tgt_ids[..., 1:].contiguous()
-            loss = self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            outputs = (loss,) + outputs
-            return outputs
+class GPT2(GPTBase):
+    def __init__(self, 
+                 embed_dim,
+                 src_vocab,
+                 tgt_vocab,
+                 **kwparams):
+        super().__init__(embed_dim, src_vocab, tgt_vocab, **kwparams)
+        self._create_tranformer_layers()
+        self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)
+        self.init_weights()
+
+    def _create_tranformer_layers(self):
+        encoder_template = nn.TransformerEncoderLayer(d_model=self.embed_dim,
+                                                      nhead=self.n_heads,
+                                                      dropout=self.dropout_rate,
+                                                      dim_feedforward=4*self.embed_dim,
+                                                      batch_first=True
+                            )
+        self.h = ModuleList([
+            nn.TransformerEncoder(encoder_template, self.n_tlayers) for _ in range(self.n_tlayers)
+        ])
+
+    def forward(self, token_ids, src_mask=None):
+        x = super().forward(token_ids, src_mask)
+        logits = self.out(x)
         return logits
-        '''
+
+
+class GPTQ(GPTBase):
+    def __init__(self,
+                 embed_dim,
+                 src_vocab,
+                 tgt_vocab,
+                 n_qlayers: int=1,
+                 q_device: str="default.qubit",
+                 **kwparams):
+        super().__init__(embed_dim,
+                                   src_vocab,
+                                   tgt_vocab,
+                                   **kwparams)
+        self.n_qlayers = n_qlayers
+        self.q_device = q_device
+        self._create_tranformer_layers()
+        self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)  # quantum-fy this?
+        # out_sz = (input_sz + 2*padding - kernel_sz) / stride + 1
+        # tgt_vocab = (embed_dim + 2*padding - kernel_sz) / stride + 1
+        #self.out = QConv1d(kernel_size=, out_channels=, n_qlayers=self.n_qlayers, stride=stride, padding=padding)
+        self.init_weights()
+
+    def _create_tranformer_layers(self):
+        self.h = ModuleList([
+            TransformerBlockQuantum(embed_dim=self.embed_dim,
+                                    n_heads=self.n_heads,
+                                    dropout_rate=self.dropout_rate,
+                                    n_qlayers=self.n_qlayers,
+                                    q_device=self.q_device) for _ in range(self.n_tlayers)
+        ])
+
+    def forward(self, token_ids, src_mask=None):
+        x = super().forward(token_ids, src_mask)
+        logits = self.out(x)
+        return logits
 
 
 class IMDbClassifier(GPTQ):
@@ -303,7 +347,7 @@ class IMDbClassifier(GPTQ):
                  lr=1e-3):
         self.n_classes = 2
         self.lr = lr
-        super(IMDbClassifier, self).__init__(
+        super().__init__(
             embed_dim=embed_dim,
             src_vocab=vocab_size,
             tgt_vocab=self.n_classes,
@@ -314,8 +358,8 @@ class IMDbClassifier(GPTQ):
             n_qlayers=n_qlayers,
             q_device=q_device)
 
-    def forward(self, token_ids, mask=None):
-        x = self._step(token_ids, mask)
+    def forward(self, token_ids, src_mask=None):
+        x = super().forward(token_ids, src_mask)
         x = x.mean(dim=1)  # average across tokens for each embedding dim
         logits = self.out(x)
         return logits
@@ -356,7 +400,7 @@ class LanguageModel(GPTQ):
                  max_seq_len: int=1024,
                  lr=1e-3):
         self.lr = lr
-        super(LanguageModel, self).__init__(
+        super().__init__(
             embed_dim=embed_dim,
             src_vocab=vocab_size,
             tgt_vocab=vocab_size,
@@ -365,8 +409,8 @@ class LanguageModel(GPTQ):
             n_layers=n_layers,
             max_seq_len=max_seq_len)
 
-    def forward(self, x, mask=None):
-        x = self._step(x, mask=mask)
+    def forward(self, x, src_mask=None):
+        x = super().forward(x, src_mask)
         logits = self.out(x)
         return logits
 
