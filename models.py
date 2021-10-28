@@ -27,7 +27,8 @@ class QConv1d(pl.LightningModule):
                  n_qlayers=1,
                  q_device='default.qubit',
                  stride=1,
-                 padding=0):
+                 padding=0,
+                 **kwargs):
         super().__init__()
         self.out_channels = out_channels
         self.padding = padding
@@ -88,8 +89,8 @@ class FeedForwardQuantum(pl.LightningModule):
                  dropout_rate=0.1,
                  n_qubits: int=5,
                  n_qlayers: int=1,
-                 q_device: str="default.qubit"
-                 ):
+                 q_device: str="default.qubit",
+                 **kwargs):
         super().__init__()
         assert n_qubits % 2 == 1, "Kernel size must be odd to conserve embedding dimension"
         padding = (n_qubits - 1) // 2
@@ -132,7 +133,7 @@ class MultiHeadAttentionQuantum(pl.LightningModule):
                  n_qubits: int=5,
                  n_qlayers: int=1,
                  q_device: str="default.qubit",
-                 ):
+                 **kwargs):
         super().__init__()
         self.embed_dim = embed_dim
         self.n_heads = n_heads
@@ -200,7 +201,8 @@ class TransformerBlockQuantum(pl.LightningModule):
                  n_qubits: int=5,
                  n_qlayers: int=1,
                  q_device: str="default.qubit",
-                 dropout_rate=0.1):
+                 dropout_rate=0.1,
+                 **kwargs):
         super().__init__()
         self.attn = MultiHeadAttentionQuantum(embed_dim,
                               n_heads=n_heads,
@@ -231,7 +233,7 @@ class GPTBase(pl.LightningModule):
                  dropout_rate=0.1,
                  n_tlayers: int=1,
                  max_seq_len: int=1024,
-                 ):
+                 **kwargs):
         super().__init__()
         self.embed_dim = embed_dim
         self.src_vocab = src_vocab
@@ -275,8 +277,8 @@ class GPT2(GPTBase):
                  embed_dim,
                  src_vocab,
                  tgt_vocab,
-                 **kwparams):
-        super().__init__(embed_dim, src_vocab, tgt_vocab, **kwparams)
+                 **kwargs):
+        super().__init__(embed_dim, src_vocab, tgt_vocab, **kwargs)
         self._create_tranformer_layers()
         self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)
         self.init_weights()
@@ -292,11 +294,12 @@ class GPT2(GPTBase):
             nn.TransformerEncoder(encoder_template, self.n_tlayers) for _ in range(self.n_tlayers)
         ])
 
+    '''
     def forward(self, token_ids, src_mask=None):
-        x = super().forward(token_ids, src_mask)
+        x = GPTBase.forward(self, token_ids, src_mask)
         logits = self.out(x)
         return logits
-
+    '''
 
 class GPTQ(GPTBase):
     def __init__(self,
@@ -305,11 +308,11 @@ class GPTQ(GPTBase):
                  tgt_vocab,
                  n_qlayers: int=1,
                  q_device: str="default.qubit",
-                 **kwparams):
+                 **kwargs):
         super().__init__(embed_dim,
                                    src_vocab,
                                    tgt_vocab,
-                                   **kwparams)
+                                   **kwargs)
         self.n_qlayers = n_qlayers
         self.q_device = q_device
         self._create_tranformer_layers()
@@ -328,55 +331,27 @@ class GPTQ(GPTBase):
                                     q_device=self.q_device) for _ in range(self.n_tlayers)
         ])
 
+    '''
     def forward(self, token_ids, src_mask=None):
-        x = super().forward(token_ids, src_mask)
+        x = GPTBase.forward(self, token_ids, src_mask)
         logits = self.out(x)
         return logits
+    '''
 
-
-class IMDbClassifier(GPTQ):
-    def __init__(self,
-                 embed_dim,
-                 vocab_size: int=2000,
-                 n_heads: int=4,
-                 dropout: float=0.1,
-                 n_tlayers: int=1,
-                 max_seq_len: int=1024,
-                 n_qlayers: int=1,
-                 q_device: str="default.qubit",
-                 lr=1e-3):
-        self.n_classes = 2
+class IMDbClassifierBase(pl.LightningModule):
+    def __init__(self, lr=1e-3, **kwargs):
         self.lr = lr
-        super().__init__(
-            embed_dim=embed_dim,
-            src_vocab=vocab_size,
-            tgt_vocab=self.n_classes,
-            n_heads=n_heads,
-            dropout=dropout,
-            n_tlayers=n_tlayers,
-            max_seq_len=max_seq_len,
-            n_qlayers=n_qlayers,
-            q_device=q_device)
-
-    def forward(self, token_ids, src_mask=None):
-        x = super().forward(token_ids, src_mask)
-        x = x.mean(dim=1)  # average across tokens for each embedding dim
-        logits = self.out(x)
-        return logits
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        logits = self(x)
+        logits = self.forward(x)
         probs = F.log_softmax(logits, dim=-1)
         loss = F.nll_loss(probs, y)
-        #shift_logits = logits[..., :-1, :].contiguous()
-        #shift_labels = tgt_ids[..., 1:].contiguous()
-        #loss = F.nll_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        logits = self(x)
+        logits = self.forward(x)
         probs = F.log_softmax(logits, dim=-1)
         loss = F.nll_loss(probs, y)
         preds = torch.argmax(probs, dim=-1)
@@ -388,6 +363,62 @@ class IMDbClassifier(GPTQ):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
+
+
+class IMDbClassifier(IMDbClassifierBase, GPT2):
+    def __init__(self,
+                 embed_dim,
+                 vocab_size: int=2000,
+                 n_heads: int=4,
+                 dropout_rate: float=0.1,
+                 n_tlayers: int=1,
+                 max_seq_len: int=1024,
+                 lr=1e-3):
+        IMDbClassifierBase.__init__(self, lr=lr)
+        GPT2.__init__(self,
+            embed_dim=embed_dim,
+            src_vocab=vocab_size,
+            tgt_vocab=2,
+            n_heads=n_heads,
+            dropout_rate=dropout_rate,
+            n_tlayers=n_tlayers,
+            max_seq_len=max_seq_len)
+
+    def forward(self, token_ids, src_mask=None):
+        x = GPT2.forward(self, token_ids, src_mask)
+        x = x.mean(dim=1)  # average across tokens for each embedding dim
+        logits = self.out(x)
+        return logits
+
+
+class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
+    def __init__(self,
+                 embed_dim,
+                 vocab_size: int=2000,
+                 n_heads: int=4,
+                 dropout_rate: float=0.1,
+                 n_tlayers: int=1,
+                 max_seq_len: int=1024,
+                 n_qlayers: int=1,
+                 q_device: str="default.qubit",
+                 lr=1e-3):
+        IMDbClassifierBase.__init__(self, lr=lr)
+        GPTQ.__init__(self,
+            embed_dim=embed_dim,
+            src_vocab=vocab_size,
+            tgt_vocab=2,
+            n_heads=n_heads,
+            dropout_rate=dropout_rate,
+            n_tlayers=n_tlayers,
+            max_seq_len=max_seq_len,
+            n_qlayers=n_qlayers,
+            q_device=q_device)
+
+    def forward(self, token_ids, src_mask=None):
+        x = GPTQ.forward(self, token_ids, src_mask)
+        x = x.mean(dim=1)  # average across tokens for each embedding dim
+        logits = self.out(x)
+        return logits
 
 
 class LanguageModel(GPTQ):
