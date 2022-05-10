@@ -1,6 +1,8 @@
 torch
 torch-vision
 torchtext
+torchdata
+torchtext
 pytorch-lightning
 torchmetrics
 pandas

@@ -90,7 +90,7 @@ class FeedForwardQuantum(pl.LightningModule):
                  dropout_rate=0.1,
                  n_qubits: int=5,
                  n_qlayers: int=1,
-                 q_device: str="default.qubit",
+                 q_device: str="lightning.qubit",
                  **kwargs):
         super().__init__()
         assert n_qubits % 2 == 1, "Kernel size must be odd to conserve embedding dimension"
@@ -133,7 +133,7 @@ class MultiHeadAttentionQuantum(pl.LightningModule):
                  n_heads: int=2,
                  n_qubits: int=5,
                  n_qlayers: int=1,
-                 q_device: str="default.qubit",
+                 q_device: str="lightning.qubit",
                  **kwargs):
         super().__init__()
         self.embed_dim = embed_dim
@@ -193,7 +193,7 @@ class TransformerBlockQuantum(pl.LightningModule):
                  n_heads: int=2,
                  n_qubits: int=5,
                  n_qlayers: int=1,
-                 q_device: str="default.qubit",
+                 q_device: str="lightning.qubit",
                  dropout_rate=0.1,
                  **kwargs):
         super().__init__()
@@ -301,7 +301,7 @@ class GPTQ(GPTBase):
                  src_vocab,
                  tgt_vocab,
                  n_qlayers: int=1,
-                 q_device: str="default.qubit",
+                 q_device: str="lightning.qubit",
                  **kwargs):
         super().__init__(embed_dim,
                                    src_vocab,
@@ -388,7 +388,7 @@ class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
                  n_tlayers: int=1,
                  max_seq_len: int=1024,
                  n_qlayers: int=1,
-                 q_device: str="default.qubit",
+                 q_device: str="lightning.qubit",
                  lr=1e-3):
         IMDbClassifierBase.__init__(self, lr=lr)
         GPTQ.__init__(self,
