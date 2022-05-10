@@ -23,7 +23,7 @@ class QConv1d(pl.LightningModule):
                  kernel_size,
                  out_channels=3,  # ie Query, Key, Value
                  n_qlayers=1,
-                 q_device='default.qubit',
+                 q_device='lightning.qubit',
                  stride=1,
                  padding=0,
                  **kwargs):
@@ -32,9 +32,10 @@ class QConv1d(pl.LightningModule):
         self.padding = padding
         self.stride = stride
         self.kernel_size = kernel_size
+        self.n_qlayers = n_qlayers
         assert self.kernel_size >= self.out_channels
         self.dev = qml.device(q_device, wires=self.kernel_size)
-        self.weights = np.random.uniform(high= 2 * np.pi, size=(n_qlayers, self.kernel_size))
+        self.weights = np.random.uniform(high= 2 * np.pi, size=(self.n_qlayers, self.kernel_size))
 
         @qml.qnode(device=self.dev, interface="torch")
         def _circuit(inputs, weights):
@@ -43,13 +44,15 @@ class QConv1d(pl.LightningModule):
             # NB: you may leave some qubits out
             return [qml.expval(qml.PauliZ(j)) for j in range(self.out_channels)]
 
-        weight_shapes = {"weights": (n_qlayers, self.kernel_size)}
+        weight_shapes = {"weights": (self.n_qlayers, self.kernel_size)}
         self.qconv = qml.qnn.TorchLayer(_circuit, weight_shapes)
     
     def draw(self):
         # build circuit by sending dummy data through it
         _ = self.qconv(inputs=torch.from_numpy(np.zeros(self.kernel_size)))
-        print(self.qconv.qnode.draw())
+        dummy_inputs = np.random.random(self.kernel_size)
+        dummy_weights = np.random.random((self.n_qlayers, self.kernel_size))
+        print(qml.draw(self.qconv.qnode)(dummy_inputs, dummy_weights))
         self.qconv.zero_grad()
 
     def forward(self, x):

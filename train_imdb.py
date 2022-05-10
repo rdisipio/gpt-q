@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
 import torch
-from torch.nn import functional as F
-from torch.utils.data import DataLoader, random_split
+#from torch.nn import functional as F
+#from torch.utils.data import DataLoader, random_split
 
-import pytorch_lightning as pl
 from pytorch_lightning import Trainer
-from pytorch_lightning.metrics.functional import accuracy
 
 from models import GPTQ, IMDbClassifier
 from dataset import IMDbData

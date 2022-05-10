@@ -2,6 +2,7 @@ torch
 torch-vision
 torchtext
 pytorch-lightning
+torchmetrics
 pandas
 tdqm
 tokenizers
