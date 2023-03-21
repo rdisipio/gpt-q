@@ -3,7 +3,7 @@ torch-vision
 torchtext
 torchdata
 torchtext
-pytorch-lightning
+lightning
 torchmetrics
 pandas
 tdqm
@@ -12,3 +12,5 @@ pennylane
 matplotlib
 seaborn
 sklearn
+sentence-transformers
+
