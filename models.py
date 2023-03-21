@@ -7,7 +7,7 @@ from torch.nn import functional as F
 from torch.nn.modules import ModuleList
 from torch.nn.modules.normalization import LayerNorm
 
-import pytorch_lightning as pl
+import lightning as L
 from torchmetrics.functional.classification.accuracy import accuracy
 
 import pennylane as qml
@@ -15,7 +15,7 @@ from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
 
 
-class QConv1d(pl.LightningModule):
+class QConv1d(L.LightningModule):
     '''
     out_sz = (input_sz + 2*padding - kernel_sz) / stride + 1
     '''
@@ -80,7 +80,7 @@ class QConv1d(pl.LightningModule):
         '''
 
 
-class FeedForwardQuantum(pl.LightningModule):
+class FeedForwardQuantum(L.LightningModule):
     '''
     Used to create contextualized embeddings from the attention heads
     '''
@@ -127,7 +127,7 @@ class FeedForwardQuantum(pl.LightningModule):
         return torch.squeeze(x, dim=-1)
 
 
-class MultiHeadAttentionQuantum(pl.LightningModule):
+class MultiHeadAttentionQuantum(L.LightningModule):
     def __init__(self,
                  embed_dim: int=8,
                  n_heads: int=2,
@@ -187,7 +187,7 @@ class MultiHeadAttentionQuantum(pl.LightningModule):
         return out
 
 
-class TransformerBlockQuantum(pl.LightningModule):
+class TransformerBlockQuantum(L.LightningModule):
     def __init__(self,
                  embed_dim,
                  n_heads: int=2,
@@ -217,7 +217,7 @@ class TransformerBlockQuantum(pl.LightningModule):
         return x
 
 
-class GPTBase(pl.LightningModule):
+class GPTBase(L.LightningModule):
     '''
     If you don't like C++ multiple inheritance, try Python
     '''
@@ -245,6 +245,9 @@ class GPTBase(pl.LightningModule):
         self.ln_f    = LayerNorm(embed_dim)
         self.attn_mask = self.generate_square_subsequent_mask(max_seq_len)
         self.init_weights()
+        
+    def get_word_embedding_dimension(self):
+        return self.embed_dim
 
     @staticmethod
     def generate_square_subsequent_mask(sz: int) -> Tensor:
@@ -326,7 +329,7 @@ class GPTQ(GPTBase):
         ])
 
 
-class IMDbClassifierBase(pl.LightningModule):
+class IMDbClassifierBase(L.LightningModule):
     def __init__(self, lr=1e-3, **kwargs):
         self.lr = lr
 

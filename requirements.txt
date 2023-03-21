@@ -11,6 +11,6 @@ tokenizers
 pennylane
 matplotlib
 seaborn
-sklearn
+scikit-learn
 sentence-transformers
 
