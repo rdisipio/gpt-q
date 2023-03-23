@@ -230,7 +230,7 @@ class GPTBase(L.LightningModule):
                  dropout_rate=0.1,
                  n_tlayers: int=1,
                  max_seq_len: int=1024,
-                 tokenizer_file: "gptq.json",
+                 tokenizer_file: str="gptq.json",
                  **kwargs):
         super().__init__()
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
@@ -253,7 +253,7 @@ class GPTBase(L.LightningModule):
         return self.embed_dim
     
     def tokenize(self, X):
-        return self.tokenize(X)
+        return self.tokenizer(X)
 
     @staticmethod
     def generate_square_subsequent_mask(sz: int) -> Tensor:
