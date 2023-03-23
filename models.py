@@ -9,6 +9,7 @@ from torch.nn.modules.normalization import LayerNorm
 
 import lightning as L
 from torchmetrics.functional.classification.accuracy import accuracy
+from transformers import PreTrainedTokenizerFast
 
 import pennylane as qml
 from pennylane import numpy as np
@@ -229,8 +230,10 @@ class GPTBase(L.LightningModule):
                  dropout_rate=0.1,
                  n_tlayers: int=1,
                  max_seq_len: int=1024,
+                 tokenizer_file: "gptq.json",
                  **kwargs):
         super().__init__()
+        self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
         self.embed_dim = embed_dim
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
@@ -248,6 +251,9 @@ class GPTBase(L.LightningModule):
         
     def get_word_embedding_dimension(self):
         return self.embed_dim
+    
+    def tokenize(self, X):
+        return self.tokenize(X)
 
     @staticmethod
     def generate_square_subsequent_mask(sz: int) -> Tensor:
