@@ -16,7 +16,7 @@ from tokenizers import ByteLevelBPETokenizer, BertWordPieceTokenizer, SentencePi
 from models import GPTQ
 
 embed_dim = 32
-vocab_size = 2000
+vocab_size = 128
 n_heads = 4
 dropout_rate = 0.1
 n_tlayers = 1
@@ -54,15 +54,6 @@ with gzip.open(sts_dataset_path, 'rt', encoding='utf8') as fIn:
             test_samples.append(inp_example)
         else:
             train_samples.append(inp_example)
-
-tokenizer = CharBPETokenizer()
-vocab_size = 16
-min_freq = 2
-#paths = [str(x) for x in Path("./datasets/").glob("*.txt")]
-tokenizer.train(files=["datasets/sentences.txt"], vocab_size=vocab_size, min_frequency=min_freq, special_tokens=special_tokens)
-tokenizer.save_model(".", model_name)
-print("Saved vocabulary")
-
 
 gptq = GPTQ(embed_dim=embed_dim,
             src_vocab=vocab_size,
