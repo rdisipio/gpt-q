@@ -237,6 +237,7 @@ class GPTBase(L.LightningModule):
                  **kwargs):
         super().__init__()
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
+        assert src_vocab == self.tokenizer.vocab_size
         self.embed_dim = embed_dim
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
