@@ -38,8 +38,15 @@ class QConv1d(L.LightningModule):
         self.kernel_size = kernel_size
         self.n_qlayers = n_qlayers
         assert self.kernel_size >= self.out_channels
-        self.dev = qml.device(q_device, wires=self.kernel_size)
         self.weights = np.random.uniform(high= 2 * np.pi, size=(self.n_qlayers, self.kernel_size))
+        dparams = {}
+        if q_device in ["braket.aws.qubit"]:
+            dparams['device_arn'] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
+            dparams['s3_destination_folder'] = {
+                'bucket': "ideal-ml-data/",
+                'folder': "braket"
+                }
+        self.dev = qml.device(q_device, wires=self.kernel_size, **dparams)
 
         @qml.qnode(device=self.dev, interface="torch")
         def _circuit(inputs, weights):
@@ -227,7 +234,6 @@ class GPTBase(L.LightningModule):
     '''
     def __init__(self,
                  embed_dim: int,
-                 #src_vocab: int,
                  tgt_vocab: int,
                  n_heads: int=4,
                  dropout_rate=0.1,
@@ -237,7 +243,6 @@ class GPTBase(L.LightningModule):
                  **kwargs):
         super().__init__()
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
-        #assert src_vocab == self.tokenizer.vocab_size, f"Vocab size mismatch: {src_vocab} vs {self.tokenizer.vocab_size} (tokenizer)"
         self.embed_dim = embed_dim
         self.src_vocab = self.tokenizer.vocab_size #src_vocab
         self.tgt_vocab = tgt_vocab
@@ -249,10 +254,10 @@ class GPTBase(L.LightningModule):
         self.wte = nn.Embedding(self.src_vocab, self.embed_dim)
         self.wpe = nn.Embedding(self.max_seq_len, self.embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(self.dropout_rate)
-        self.ln_f    = LayerNorm(self.embed_dim)
+        self.ln_f = LayerNorm(self.embed_dim)
         self.attn_mask = self.generate_square_subsequent_mask(self.max_seq_len)
         self.init_weights()
-        
+
     def get_word_embedding_dimension(self):
         return self.embed_dim
     
@@ -274,8 +279,8 @@ class GPTBase(L.LightningModule):
     def forward(self, inputs, src_mask=None):
         token_ids = [torch.LongTensor(x) for x in inputs['input_ids']]
         token_ids = pad_sequence(token_ids, self.max_seq_len)
-        token_type_ids = inputs['token_type_ids']
-        attention_mask = inputs['attention_mask']
+        # token_type_ids = inputs['token_type_ids']
+        # attention_mask = inputs['attention_mask']
         if src_mask is None:
             src_mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
@@ -292,10 +297,9 @@ class GPTBase(L.LightningModule):
 class GPT2(GPTBase):
     def __init__(self, 
                  embed_dim,
-                 # src_vocab,
                  tgt_vocab,
                  **kwargs):
-        super().__init__(embed_dim, src_vocab, tgt_vocab, **kwargs)
+        super().__init__(embed_dim, tgt_vocab, **kwargs)
         self._create_tranformer_layers()
         self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)
         self.init_weights()
@@ -315,22 +319,18 @@ class GPT2(GPTBase):
 class GPTQ(GPTBase):
     def __init__(self,
                  embed_dim,
-                 # src_vocab,
                  tgt_vocab,
                  n_qlayers: int=1,
-                 q_device: str="lightning.qubit",
+                 q_device: str="lightning.qubit",  # lightning.gpu, braket.aws.qubit, default.qubit
                  **kwargs):
-        super().__init__(embed_dim,
-                         #src_vocab,
-                        tgt_vocab,
-                        **kwargs)
+        super().__init__(embed_dim, tgt_vocab, **kwargs)
         self.n_qlayers = n_qlayers
         self.q_device = q_device
         self._create_tranformer_layers()
-        self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)  # quantum-fy this?
+        self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)  # quantum-fy this, too?
         # out_sz = (input_sz + 2*padding - kernel_sz) / stride + 1
         # tgt_vocab = (embed_dim + 2*padding - kernel_sz) / stride + 1
-        #self.out = QConv1d(kernel_size=, out_channels=, n_qlayers=self.n_qlayers, stride=stride, padding=padding)
+        # self.out = QConv1d(kernel_size=, out_channels=, n_qlayers=self.n_qlayers, stride=stride, padding=padding)
         self.init_weights()
 
     def _create_tranformer_layers(self):

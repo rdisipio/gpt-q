@@ -24,7 +24,8 @@ dropout_rate = 0.1
 n_tlayers = 1
 max_seq_len = 128
 n_qlayers = 1
-q_device: str="lightning.qubit"
+#q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
+q_device = "braket.aws.qubit"
 lr = 1e-3
 
 model_name = 'gptq'

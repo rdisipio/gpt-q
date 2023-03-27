@@ -9,6 +9,8 @@ pandas
 tdqm
 tokenizers
 pennylane
+amazon-braket-sdk
+amazon-braket-pennylane-plugin
 matplotlib
 seaborn
 scikit-learn
