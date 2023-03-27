@@ -67,7 +67,7 @@ test_samples = test_samples[:n]
 
 
 gptq = GPTQ(embed_dim=embed_dim,
-            tgt_vocab=2,
+            tgt_vocab=vocab_size,
             n_heads=n_heads,
             dropout_rate=dropout_rate,
             n_tlayers=n_tlayers,
