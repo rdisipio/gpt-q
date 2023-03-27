@@ -19,6 +19,7 @@ from models import GPTQ
 
 embed_dim = 32
 vocab_size = 512
+output_features = 8
 n_heads = 4
 dropout_rate = 0.1
 n_tlayers = 1
@@ -59,6 +60,12 @@ with gzip.open(sts_dataset_path, 'rt', encoding='utf8') as fIn:
         else:
             train_samples.append(inp_example)
 
+# hack
+n = 5
+train_samples = train_samples[:n]
+test_samples = test_samples[:n]
+
+
 gptq = GPTQ(embed_dim=embed_dim,
             tgt_vocab=2,
             n_heads=n_heads,
@@ -69,7 +76,7 @@ gptq = GPTQ(embed_dim=embed_dim,
             n_qubits=n_qubits,
             q_device=q_device)
 pooling_model = models.Pooling(gptq.get_word_embedding_dimension())
-dense_model = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=256, activation_function=torch.nn.Tanh())
+dense_model = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=output_features, activation_function=torch.nn.Tanh())
 
 model = SentenceTransformer(modules=[gptq, pooling_model, dense_model])
 
