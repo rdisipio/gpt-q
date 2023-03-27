@@ -17,7 +17,7 @@ from tokenizers import ByteLevelBPETokenizer, BertWordPieceTokenizer, SentencePi
 
 from models import GPTQ
 
-embed_dim = 32
+embed_dim = 8
 vocab_size = 512
 output_features = 8
 n_heads = 4
