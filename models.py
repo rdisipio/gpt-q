@@ -227,7 +227,7 @@ class GPTBase(L.LightningModule):
     '''
     def __init__(self,
                  embed_dim: int,
-                 src_vocab: int,
+                 #src_vocab: int,
                  tgt_vocab: int,
                  n_heads: int=4,
                  dropout_rate=0.1,
@@ -237,20 +237,20 @@ class GPTBase(L.LightningModule):
                  **kwargs):
         super().__init__()
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
-        assert src_vocab == self.tokenizer.vocab_size
+        #assert src_vocab == self.tokenizer.vocab_size, f"Vocab size mismatch: {src_vocab} vs {self.tokenizer.vocab_size} (tokenizer)"
         self.embed_dim = embed_dim
-        self.src_vocab = src_vocab
+        self.src_vocab = self.tokenizer.vocab_size #src_vocab
         self.tgt_vocab = tgt_vocab
         self.n_heads = n_heads
         self.dropout_rate = dropout_rate
         self.n_tlayers = n_tlayers
         self.max_seq_len = max_seq_len
         self.h = None
-        self.wte = nn.Embedding(src_vocab, embed_dim)
-        self.wpe = nn.Embedding(max_seq_len, embed_dim)  # this is learned, not pre-computed
+        self.wte = nn.Embedding(self.src_vocab, self.embed_dim)
+        self.wpe = nn.Embedding(self.max_seq_len, self.embed_dim)  # this is learned, not pre-computed
         self.dropout = nn.Dropout(self.dropout_rate)
-        self.ln_f    = LayerNorm(embed_dim)
-        self.attn_mask = self.generate_square_subsequent_mask(max_seq_len)
+        self.ln_f    = LayerNorm(self.embed_dim)
+        self.attn_mask = self.generate_square_subsequent_mask(self.max_seq_len)
         self.init_weights()
         
     def get_word_embedding_dimension(self):
@@ -292,7 +292,7 @@ class GPTBase(L.LightningModule):
 class GPT2(GPTBase):
     def __init__(self, 
                  embed_dim,
-                 src_vocab,
+                 # src_vocab,
                  tgt_vocab,
                  **kwargs):
         super().__init__(embed_dim, src_vocab, tgt_vocab, **kwargs)
@@ -315,15 +315,15 @@ class GPT2(GPTBase):
 class GPTQ(GPTBase):
     def __init__(self,
                  embed_dim,
-                 src_vocab,
+                 # src_vocab,
                  tgt_vocab,
                  n_qlayers: int=1,
                  q_device: str="lightning.qubit",
                  **kwargs):
         super().__init__(embed_dim,
-                                   src_vocab,
-                                   tgt_vocab,
-                                   **kwargs)
+                         #src_vocab,
+                        tgt_vocab,
+                        **kwargs)
         self.n_qlayers = n_qlayers
         self.q_device = q_device
         self._create_tranformer_layers()
@@ -373,7 +373,7 @@ class IMDbClassifierBase(L.LightningModule):
 class IMDbClassifier(IMDbClassifierBase, GPT2):
     def __init__(self,
                  embed_dim,
-                 vocab_size: int=2000,
+                 # vocab_size: int=2000,
                  n_heads: int=4,
                  dropout_rate: float=0.1,
                  n_tlayers: int=1,
@@ -382,7 +382,7 @@ class IMDbClassifier(IMDbClassifierBase, GPT2):
         IMDbClassifierBase.__init__(self, lr=lr)
         GPT2.__init__(self,
             embed_dim=embed_dim,
-            src_vocab=vocab_size,
+            # src_vocab=vocab_size,
             tgt_vocab=2,
             n_heads=n_heads,
             dropout_rate=dropout_rate,
@@ -399,7 +399,7 @@ class IMDbClassifier(IMDbClassifierBase, GPT2):
 class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
     def __init__(self,
                  embed_dim,
-                 vocab_size: int=2000,
+                 # vocab_size: int=2000,
                  n_heads: int=4,
                  dropout_rate: float=0.1,
                  n_tlayers: int=1,
@@ -410,7 +410,7 @@ class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
         IMDbClassifierBase.__init__(self, lr=lr)
         GPTQ.__init__(self,
             embed_dim=embed_dim,
-            src_vocab=vocab_size,
+            # src_vocab=vocab_size,
             tgt_vocab=2,
             n_heads=n_heads,
             dropout_rate=dropout_rate,
@@ -429,7 +429,7 @@ class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
 class LanguageModel(GPTQ):
     def __init__(self, 
                  embed_dim,
-                 vocab_size: int=2000,
+                 # vocab_size: int=2000,
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
@@ -438,7 +438,7 @@ class LanguageModel(GPTQ):
         self.lr = lr
         super().__init__(
             embed_dim=embed_dim,
-            src_vocab=vocab_size,
+            # src_vocab=vocab_size,
             tgt_vocab=vocab_size,
             n_heads=n_heads,
             dropout=dropout,

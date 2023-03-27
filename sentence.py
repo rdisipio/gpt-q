@@ -18,7 +18,7 @@ from tokenizers import ByteLevelBPETokenizer, BertWordPieceTokenizer, SentencePi
 from models import GPTQ
 
 embed_dim = 32
-vocab_size = 128
+vocab_size = 512
 n_heads = 4
 dropout_rate = 0.1
 n_tlayers = 1
@@ -58,7 +58,6 @@ with gzip.open(sts_dataset_path, 'rt', encoding='utf8') as fIn:
             train_samples.append(inp_example)
 
 gptq = GPTQ(embed_dim=embed_dim,
-            src_vocab=vocab_size,
             tgt_vocab=2,
             n_heads=n_heads,
             dropout_rate=dropout_rate,

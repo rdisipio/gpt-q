@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tokenizer', default="char-bpe")
     parser.add_argument('-i', '--input_path', default="./datasets/")
     parser.add_argument('-o', '--output', default="gptq")
-    parser.add_argument('-s', '--vocab_size', type=int, default=128)
+    parser.add_argument('-s', '--vocab_size', type=int, default=512)
     parser.add_argument('-f', '--min_freq', type=int, default=2)
     args = parser.parse_args()
 
