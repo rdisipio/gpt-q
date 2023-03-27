@@ -1,5 +1,6 @@
 import math
 import copy
+from datetime import datetime
 
 import torch
 from torch import nn, Tensor
@@ -41,8 +42,9 @@ class QConv1d(L.LightningModule):
         self.weights = np.random.uniform(high= 2 * np.pi, size=(self.n_qlayers, self.kernel_size))
         dparams = {}
         if q_device in ["braket.aws.qubit"]:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             dparams['device_arn'] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
-            dparams['s3_destination_folder'] = ("amazon-braket-ideal-datasets", "gptq")
+            dparams['s3_destination_folder'] = ("amazon-braket-ideal-datasets", f"gptq/{timestamp}")
         self.dev = qml.device(q_device, wires=self.kernel_size, **dparams)
 
         @qml.qnode(device=self.dev, interface="torch")
@@ -318,10 +320,12 @@ class GPTQ(GPTBase):
                  embed_dim,
                  tgt_vocab,
                  n_qlayers: int=1,
+                 n_qubits: int=5,
                  q_device: str="lightning.qubit",  # lightning.gpu, braket.aws.qubit, default.qubit
                  **kwargs):
         super().__init__(embed_dim, tgt_vocab, **kwargs)
         self.n_qlayers = n_qlayers
+        self.n_qubits = n_qubits
         self.q_device = q_device
         self._create_tranformer_layers()
         self.out = nn.Linear(embed_dim, tgt_vocab, bias=False)  # quantum-fy this, too?
@@ -336,6 +340,7 @@ class GPTQ(GPTBase):
                                     n_heads=self.n_heads,
                                     dropout_rate=self.dropout_rate,
                                     n_qlayers=self.n_qlayers,
+                                    n_qubits=self.n_qubits,
                                     q_device=self.q_device) for _ in range(self.n_tlayers)
         ])
 

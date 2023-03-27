@@ -24,8 +24,9 @@ dropout_rate = 0.1
 n_tlayers = 1
 max_seq_len = 128
 n_qlayers = 1
-#q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
-q_device = "braket.aws.qubit"
+n_qubits = 5
+q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
+#q_device = "braket.aws.qubit"
 lr = 1e-3
 
 model_name = 'gptq'
@@ -65,6 +66,7 @@ gptq = GPTQ(embed_dim=embed_dim,
             n_tlayers=n_tlayers,
             max_seq_len=max_seq_len,
             n_qlayers=n_qlayers,
+            n_qubits=n_qubits,
             q_device=q_device)
 pooling_model = models.Pooling(gptq.get_word_embedding_dimension())
 dense_model = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=256, activation_function=torch.nn.Tanh())
