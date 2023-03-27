@@ -294,6 +294,7 @@ class GPTBase(L.LightningModule):
         x = self.ln_f(x)
         if not self.batch_first:
             x = torch.transpose(x, 0, 1) # eg (5,16,8)->(16,5,8)
+        print(">> gptq")
         return {
                 'input_ids': token_ids,
                 'token_type_ids': token_type_ids,
