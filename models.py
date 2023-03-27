@@ -17,7 +17,7 @@ import pennylane as qml
 from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
 
-from utils import pad_sequence
+from utils import pad_sequence, make_padding_mask
 
 
 class QConv1d(L.LightningModule):
@@ -239,6 +239,7 @@ class GPTBase(L.LightningModule):
                  n_tlayers: int=1,
                  max_seq_len: int=512,
                  tokenizer_file: str="gptq.json",
+                 batch_first: bool=True,
                  **kwargs):
         super().__init__()
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
@@ -247,6 +248,7 @@ class GPTBase(L.LightningModule):
         self.tgt_vocab = tgt_vocab
         self.n_heads = n_heads
         self.dropout_rate = dropout_rate
+        self.batch_first = batch_first
         self.n_tlayers = n_tlayers
         self.max_seq_len = max_seq_len
         self.h = None
@@ -278,8 +280,8 @@ class GPTBase(L.LightningModule):
     def forward(self, inputs, src_mask=None):
         token_ids = [torch.LongTensor(x) for x in inputs['input_ids']]
         token_ids = pad_sequence(token_ids, self.max_seq_len)
-        # token_type_ids = inputs['token_type_ids']
-        # attention_mask = inputs['attention_mask']
+        token_type_ids = pad_sequence([torch.LongTensor(x) for x in inputs['token_type_ids']], self.max_seq_len)
+        attention_mask = pad_sequence([torch.LongTensor(x) for x in inputs['attention_mask']], self.max_seq_len)
         if src_mask is None:
             src_mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
@@ -290,7 +292,14 @@ class GPTBase(L.LightningModule):
         for i in range(self.n_tlayers): 
             x = self.h[i](x, src_mask)
         x = self.ln_f(x)
-        return x
+        if not self.batch_first:
+            x = torch.transpose(x, 0, 1) # eg (5,16,8)->(16,5,8)
+        return {
+                'input_ids': token_ids,
+                'token_type_ids': token_type_ids,
+                'token_embeddings': x,
+                'attention_mask': attention_mask
+        }
 
 
 class GPT2(GPTBase):

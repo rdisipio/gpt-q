@@ -23,7 +23,7 @@ output_features = 8
 n_heads = 4
 dropout_rate = 0.1
 n_tlayers = 1
-max_seq_len = 12
+max_seq_len = 16
 n_qlayers = 1
 n_qubits = 5 # must be odd and > 3 (ie query, key, value)
 q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
@@ -74,7 +74,8 @@ gptq = GPTQ(embed_dim=embed_dim,
             max_seq_len=max_seq_len,
             n_qlayers=n_qlayers,
             n_qubits=n_qubits,
-            q_device=q_device)
+            q_device=q_device,
+            batch_first=True)
 pooling_model = models.Pooling(gptq.get_word_embedding_dimension())
 dense_model = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=output_features, activation_function=torch.nn.Tanh())
 

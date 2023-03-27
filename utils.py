@@ -28,7 +28,7 @@ def make_subsequent_mask(size):
 
 
 def make_padding_mask(src, pad=0):
-    src = torch.from_numpy(src)
+    #src = torch.from_numpy(src)
     mask = (src != pad)
     mask = torch.unsqueeze(mask, -2)
     return mask
@@ -36,6 +36,7 @@ def make_padding_mask(src, pad=0):
 
 def make_lookahead_mask(tgt, pad=0):
     "Create a mask to hide padding and future words."
+    tgt = torch.from_numpy(tgt)
     tgt_mask = make_padding_mask(tgt, pad)
     tgt_mask = tgt_mask & Variable(
         make_subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
