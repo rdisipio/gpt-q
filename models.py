@@ -4,6 +4,7 @@ import copy
 import torch
 from torch import nn, Tensor
 from torch.nn import functional as F
+from torch.nn import ConstantPad1d
 from torch.nn.modules import ModuleList
 from torch.nn.modules.normalization import LayerNorm
 
@@ -14,6 +15,8 @@ from transformers import PreTrainedTokenizerFast
 import pennylane as qml
 from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
+
+from utils import pad_sequence
 
 
 class QConv1d(L.LightningModule):
@@ -229,7 +232,7 @@ class GPTBase(L.LightningModule):
                  n_heads: int=4,
                  dropout_rate=0.1,
                  n_tlayers: int=1,
-                 max_seq_len: int=1024,
+                 max_seq_len: int=512,
                  tokenizer_file: str="gptq.json",
                  **kwargs):
         super().__init__()
@@ -267,7 +270,11 @@ class GPTBase(L.LightningModule):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, token_ids, src_mask=None):
+    def forward(self, inputs, src_mask=None):
+        token_ids = [torch.LongTensor(x) for x in inputs['input_ids']]
+        token_ids = pad_sequence(token_ids, self.max_seq_len)
+        token_type_ids = inputs['token_type_ids']
+        attention_mask = inputs['attention_mask']
         if src_mask is None:
             src_mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)

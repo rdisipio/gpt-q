@@ -1,5 +1,17 @@
 import torch
 import numpy as np
+from torch.nn import functional as F
+
+
+def pad_sequence(X, max_seq_len=None):
+    Z = torch.nn.utils.rnn.pad_sequence(X, batch_first=True)
+    if max_seq_len is None:
+        return Z
+    Z_max_len = Z.size(-1)
+    if Z_max_len > max_seq_len:
+        return Z[:, :max_seq_len]
+    else:
+        return F.pad(Z, (0, max_seq_len - Z_max_len))
 
 
 def make_src_mask(sz):
