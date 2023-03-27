@@ -42,7 +42,7 @@ class QConv1d(L.LightningModule):
         dparams = {}
         if q_device in ["braket.aws.qubit"]:
             dparams['device_arn'] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
-            dparams['s3_destination_folder'] = ("ideal-ml-data/", "braket")
+            dparams['s3_destination_folder'] = ("ideal-ml-data", "braket")
         self.dev = qml.device(q_device, wires=self.kernel_size, **dparams)
 
         @qml.qnode(device=self.dev, interface="torch")
