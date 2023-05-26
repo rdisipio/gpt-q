@@ -31,6 +31,7 @@ class QConv1d(L.LightningModule):
                  q_device='lightning.qubit',
                  stride=1,
                  padding=0,
+                 shots=100,
                  **kwargs):
         super().__init__()
         self.out_channels = out_channels
@@ -40,7 +41,9 @@ class QConv1d(L.LightningModule):
         self.n_qlayers = n_qlayers
         assert self.kernel_size >= self.out_channels
         self.weights = np.random.uniform(high= 2 * np.pi, size=(self.n_qlayers, self.kernel_size))
-        dparams = {}
+        dparams = {
+            'shots': shots,
+        }
         if q_device in ["braket.aws.qubit"]:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             dparams['device_arn'] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
