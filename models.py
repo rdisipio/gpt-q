@@ -301,6 +301,9 @@ class GPTBase(L.LightningModule):
                 'token_embeddings': x,
                 'attention_mask': attention_mask
         }
+    
+    def save(self, model_path):
+        torch.save(self.state_dict(), model_path)
 
 
 class GPT2(GPTBase):
