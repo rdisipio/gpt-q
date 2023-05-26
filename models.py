@@ -42,13 +42,17 @@ class QConv1d(L.LightningModule):
         assert self.kernel_size >= self.out_channels
         self.weights = np.random.uniform(high= 2 * np.pi, size=(self.n_qlayers, self.kernel_size))
         dparams = {
+            'wires': self.kernel_size, 
             'shots': shots,
         }
+        if q_device in ['rigetti.qvm', 'rigetti.pyqvm']:
+            dparams['device'] = f"{self.kernel_size}q-pyqvm"
+            dparams.pop('wires')
         if q_device in ["braket.aws.qubit"]:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             dparams['device_arn'] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
             dparams['s3_destination_folder'] = ("amazon-braket-ideal-datasets", f"gptq/{timestamp}")
-        self.dev = qml.device(q_device, wires=self.kernel_size, **dparams)
+        self.dev = qml.device(q_device, **dparams)
 
         @qml.qnode(device=self.dev, interface="torch")
         def _circuit(inputs, weights):
