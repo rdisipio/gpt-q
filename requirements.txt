@@ -18,4 +18,5 @@ sentence-transformers
 jupyterlab
 qulacs
 pennylane-qulacs
-
+pyquil
+pennylane-forest
