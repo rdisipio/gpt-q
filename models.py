@@ -306,7 +306,7 @@ class GPTBase(L.LightningModule):
         }
     
     def save(self, model_path):
-        torch.save(self.state_dict(), model_path)
+        torch.save(self.state_dict(), model_path + "/model.pth")
 
 
 class GPT2(GPTBase):

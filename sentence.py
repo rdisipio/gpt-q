@@ -26,8 +26,8 @@ n_tlayers = 1
 max_seq_len = 16
 n_qlayers = 1
 n_qubits = 5 # must be odd and > 3 (ie query, key, value)
-#q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
-q_device = "qulacs.simulator"
+q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
+#q_device = "qulacs.simulator"
 #q_device = "braket.aws.qubit"
 lr = 1e-3
 
@@ -81,7 +81,7 @@ pooling_model = models.Pooling(gptq.get_word_embedding_dimension())
 dense_model = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=output_features, activation_function=torch.nn.Tanh())
 
 model = SentenceTransformer(modules=[gptq, pooling_model, dense_model])
-
+#model.save("output/test")
 train_dataloader = DataLoader(train_samples, shuffle=True, batch_size=train_batch_size)
 train_loss = losses.CosineSimilarityLoss(model=model)
 
