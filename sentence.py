@@ -26,7 +26,8 @@ n_tlayers = 1
 max_seq_len = 16
 n_qlayers = 1
 n_qubits = 5 # must be odd and > 3 (ie query, key, value)
-q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
+#q_device = "lightning.qubit" # lightning.gpu, braket.aws.qubit, default.qubit
+q_device = "qulacs.simulator"
 #q_device = "braket.aws.qubit"
 lr = 1e-3
 

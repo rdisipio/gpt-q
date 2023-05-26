@@ -16,4 +16,6 @@ seaborn
 scikit-learn
 sentence-transformers
 jupyterlab
+qulacs
+pennylane-qulacs
 
