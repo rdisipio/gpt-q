@@ -1,5 +1,6 @@
 torch
 torch-vision
+torchvision
 torchtext
 torchdata
 torchtext
@@ -9,8 +10,6 @@ pandas
 tdqm
 tokenizers
 pennylane
-amazon-braket-sdk
-amazon-braket-pennylane-plugin
 matplotlib
 seaborn
 scikit-learn
@@ -18,5 +17,5 @@ sentence-transformers
 jupyterlab
 qulacs
 pennylane-qulacs
-pyquil
-pennylane-forest
+jupyterlab
+torch

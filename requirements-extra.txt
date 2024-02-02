@@ -1,0 +1,4 @@
+amazon-braket-sdk
+amazon-braket-pennylane-plugin
+pyquil
+pennylane-forest
