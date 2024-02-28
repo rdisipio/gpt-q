@@ -21,6 +21,14 @@ charset-normalizer==3.3.2
 click==8.1.7
 comm==0.2.1
 contourpy==1.2.0
+cupy-cuda11x==13.0.0
+cuquantum==23.10.0
+cuquantum-cu11==23.10.0
+cuquantum-python==23.10.0
+cuquantum-python-cu11==23.10.0
+custatevec-cu11==1.5.0
+cutensor-cu11==1.7.0
+cutensornet-cu11==2.3.0
 cycler==0.12.1
 debugpy==1.8.0
 decorator==5.1.1
@@ -28,6 +36,7 @@ defusedxml==0.7.1
 exceptiongroup==1.2.0
 executing==2.0.1
 fastjsonschema==2.19.1
+fastrlock==0.8.2
 filelock==3.13.1
 fonttools==4.47.2
 fqdn==1.5.1
@@ -93,7 +102,6 @@ pandocfilters==1.5.1
 parso==0.8.3
 PennyLane==0.34.0
 PennyLane-Lightning==0.34.0
-pennylane-qulacs==0.32.0
 pexpect==4.9.0
 pillow==10.2.0
 platformdirs==4.2.0
@@ -111,7 +119,6 @@ pytorch-lightning==2.1.4
 pytz==2024.1
 PyYAML==6.0.1
 pyzmq==25.1.2
-qulacs==0.6.3
 referencing==0.33.0
 regex==2023.12.25
 requests==2.31.0
