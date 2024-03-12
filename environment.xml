@@ -1,60 +1,88 @@
-name: gptq
+name: base
 channels:
-  - conda-forge
   - defaults
 dependencies:
-  - _libgcc_mutex=0.1=conda_forge
-  - _openmp_mutex=4.5=2_gnu
+  - _libgcc_mutex=0.1=main
+  - _openmp_mutex=5.1=1_gnu
+  - archspec=0.2.1=pyhd3eb1b0_0
+  - blas=1.0=mkl
+  - boltons=23.0.0=py311h06a4308_0
+  - brotli-python=1.0.9=py311h6a678d5_7
   - bzip2=1.0.8=h7b6447c_0
-  - ca-certificates=2024.2.2=hbcca054_0
-  - cuda-cudart=12.3.101=hd3aeb46_0
-  - cuda-cudart_linux-64=12.3.101=h59595ed_0
-  - cuda-nvrtc=12.3.107=hd3aeb46_0
-  - cuda-nvtx=12.3.101=h59595ed_0
-  - cuda-version=12.3=h32bc705_2
-  - cupy=12.3.0=py312h9ccbb96_2
-  - cuquantum=23.10.0.6=ha770c72_3
-  - cuquantum-python=23.10.0=py312h00b64ba_3
-  - custatevec=1.5.0=h10b603f_3
-  - cutensor=1.7.0.1=h10b603f_3
-  - cutensornet=2.3.0=nompi_hedba195_103
-  - expat=2.5.0=h6a678d5_0
-  - fastrlock=0.8.2=py312h30efb56_2
+  - c-ares=1.19.1=h5eee18b_0
+  - ca-certificates=2023.12.12=h06a4308_0
+  - certifi=2023.11.17=py311h06a4308_0
+  - cffi=1.16.0=py311h5eee18b_0
+  - charset-normalizer=2.0.4=pyhd3eb1b0_0
+  - conda=24.1.0=py311h06a4308_0
+  - conda-content-trust=0.2.0=py311h06a4308_0
+  - conda-libmamba-solver=23.12.0=pyhd3eb1b0_1
+  - conda-package-handling=2.2.0=py311h06a4308_0
+  - conda-package-streaming=0.9.0=py311h06a4308_0
+  - cryptography=41.0.7=py311hdda0065_0
+  - distro=1.8.0=py311h06a4308_0
+  - fmt=9.1.0=hdb19cb5_0
+  - icu=73.1=h6a678d5_0
+  - idna=3.4=py311h06a4308_0
+  - intel-openmp=2023.1.0=hdb19cb5_46306
+  - jsonpatch=1.32=pyhd3eb1b0_0
+  - jsonpointer=2.1=pyhd3eb1b0_0
+  - krb5=1.20.1=h143b758_1
   - ld_impl_linux-64=2.38=h1181459_1
-  - libblas=3.9.0=21_linux64_openblas
-  - libcblas=3.9.0=21_linux64_openblas
-  - libcublas=12.3.4.1=hd3aeb46_0
-  - libcufft=11.0.12.1=hd3aeb46_0
-  - libcurand=10.3.4.107=hd3aeb46_0
-  - libcusolver=11.5.4.101=hd3aeb46_0
-  - libcusparse=12.2.0.103=hd3aeb46_0
-  - libexpat=2.5.0=hcb278e6_1
+  - libarchive=3.6.2=h6ac8c49_2
+  - libcurl=8.4.0=h251f7ec_1
+  - libedit=3.1.20230828=h5eee18b_0
+  - libev=4.33=h7f8727e_1
   - libffi=3.4.4=h6a678d5_0
-  - libgcc-ng=13.2.0=h807b86a_5
-  - libgfortran-ng=13.2.0=h69a702a_5
-  - libgfortran5=13.2.0=ha4646dd_5
-  - libgomp=13.2.0=h807b86a_5
-  - liblapack=3.9.0=21_linux64_openblas
-  - libnsl=2.0.1=hd590300_0
-  - libnvjitlink=12.3.101=hd3aeb46_0
-  - libopenblas=0.3.26=pthreads_h413a1c8_0
-  - libsqlite=3.45.1=h2797004_0
-  - libstdcxx-ng=13.2.0=h7e041cc_5
-  - libuuid=2.38.1=h0b41bf4_0
-  - libxcrypt=4.4.36=hd590300_1
-  - libzlib=1.2.13=hd590300_5
+  - libgcc-ng=11.2.0=h1234567_1
+  - libgomp=11.2.0=h1234567_1
+  - libmamba=1.5.3=haf1ee3a_0
+  - libmambapy=1.5.3=py311h2dafd23_0
+  - libnghttp2=1.57.0=h2d74bed_0
+  - libsolv=0.7.24=he621ea3_0
+  - libssh2=1.10.0=hdbd6064_2
+  - libstdcxx-ng=11.2.0=h1234567_1
+  - libuuid=1.41.5=h5eee18b_0
+  - libxml2=2.10.4=hf1b16e4_1
+  - lz4-c=1.9.4=h6a678d5_0
+  - menuinst=2.0.1=py311h06a4308_1
+  - mkl=2023.1.0=h213fc3f_46344
+  - mkl-service=2.4.0=py311h5eee18b_1
+  - mkl_fft=1.3.8=py311h5eee18b_0
+  - mkl_random=1.2.4=py311hdb19cb5_0
   - ncurses=6.4=h6a678d5_0
-  - numpy=1.26.4=py312heda63a1_0
-  - openssl=3.2.1=hd590300_0
-  - pip=23.3.1=py312h06a4308_0
-  - python=3.12.2=hab00c5b_0_cpython
-  - python_abi=3.12=4_cp312
+  - numpy=1.26.3=py311h08b1b3b_0
+  - numpy-base=1.26.3=py311hf175353_0
+  - openssl=3.0.12=h7f8727e_0
+  - packaging=23.1=py311h06a4308_0
+  - pcre2=10.42=hebb0a14_0
+  - platformdirs=3.10.0=py311h06a4308_0
+  - pluggy=1.0.0=py311h06a4308_1
+  - pybind11-abi=4=hd3eb1b0_1
+  - pycosat=0.6.6=py311h5eee18b_0
+  - pycparser=2.21=pyhd3eb1b0_0
+  - pyopenssl=23.2.0=py311h06a4308_0
+  - pysocks=1.7.1=py311h06a4308_0
+  - python=3.11.5=h955ad1f_0
   - readline=8.2=h5eee18b_0
-  - setuptools=68.2.2=py312h06a4308_0
+  - reproc=14.2.4=h295c915_1
+  - reproc-cpp=14.2.4=h295c915_1
+  - requests=2.31.0=py311h06a4308_0
+  - ruamel.yaml=0.17.21=py311h5eee18b_0
+  - setuptools=68.2.2=py311h06a4308_0
   - sqlite=3.41.2=h5eee18b_0
-  - tk=8.6.13=noxft_h4845f30_101
-  - tzdata=2023d=h04d1e81_0
-  - wheel=0.41.2=py312h06a4308_0
+  - tbb=2021.8.0=hdb19cb5_0
+  - tk=8.6.12=h1ccaba5_0
+  - tqdm=4.65.0=py311h92b7b1e_0
+  - truststore=0.8.0=py311h06a4308_0
+  - tzdata=2023c=h04d1e81_0
+  - urllib3=1.26.18=py311h06a4308_0
+  - wheel=0.41.2=py311h06a4308_0
   - xz=5.4.5=h5eee18b_0
-  - zlib=1.2.13=hd590300_5
-prefix: /home/ec2-user/miniconda3/envs/gptq
+  - yaml-cpp=0.8.0=h6a678d5_0
+  - zlib=1.2.13=h5eee18b_0
+  - zstandard=0.19.0=py311h5eee18b_0
+  - zstd=1.5.5=hc292b87_0
+  - pip:
+      - pip==24.0
+prefix: /home/ec2-user/miniconda3
