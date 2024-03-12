@@ -194,7 +194,9 @@ class MultiHeadAttentionQuantum(L.LightningModule):
         return x.view(*new_shape)
 
     def forward(self, x, mask=None):
-        x = self.c_attn(x)
+        x = self.c_attn(x).to(self.device)
+        if mask is not None:
+            mask = mask.to(self.device)
         q, k, v = x[:, :, :,  0], x[:, :, :, 1], x[:, :, :, 2]
         q, k, v = self.split_heads(q), self.split_heads(k), self.split_heads(v)
         out = self._attn(q, k, v, mask)
@@ -260,7 +262,7 @@ class GPTBase(L.LightningModule):
         self.max_seq_len = max_seq_len
         self.h = None
         self.wte = nn.Embedding(self.src_vocab, self.embed_dim)
-        self.wpe = nn.Embedding(self.max_seq_len, self.embed_dim)  # this is learned, not pre-computed
+        self.wpe = nn.Embedding(self.max_seq_len, self.embed_dim) # this is learned, not pre-computed
         self.dropout = nn.Dropout(self.dropout_rate)
         self.ln_f = LayerNorm(self.embed_dim)
         self.attn_mask = self.generate_square_subsequent_mask(self.max_seq_len)
@@ -285,13 +287,13 @@ class GPTBase(L.LightningModule):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, inputs, src_mask=None):
-        token_ids = [torch.LongTensor(x) for x in inputs['input_ids']]
+        token_ids = [torch.LongTensor(x).to(self.device) for x in inputs['input_ids']]
         token_ids = pad_sequence(token_ids, self.max_seq_len)
-        token_type_ids = pad_sequence([torch.LongTensor(x) for x in inputs['token_type_ids']], self.max_seq_len)
-        attention_mask = pad_sequence([torch.LongTensor(x) for x in inputs['attention_mask']], self.max_seq_len)
+        token_type_ids = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs['token_type_ids']], self.max_seq_len)
+        attention_mask = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs['attention_mask']], self.max_seq_len)
         if src_mask is None:
             src_mask = self.attn_mask
-        pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0)
+        pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0).to(self.device)
         x_tokens = self.wte(token_ids)
         x_pos = self.wpe(pos_ids)
         x = x_tokens + x_pos
