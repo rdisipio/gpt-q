@@ -7,6 +7,6 @@ WORKDIR /home/idies
 COPY environment.yml /home/idies
 COPY requirements-no-version.txt /home/idies
 
-RUN ( conda env create --name qml --file=environments.yml )
+RUN ( conda env create --name qml --file=environment.yml )
 
 USER root
