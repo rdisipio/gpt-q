@@ -100,7 +100,7 @@ jupyterlab-pygments==0.2.2
 jupyterlab_server==2.22.1
 kiwisolver==1.4.4
 lark==0.11.3
-lightning==2.0.0
+lightning==2.2.1
 lightning-cloud==0.5.32
 lightning-utilities==0.8.0
 lit==16.0.0
