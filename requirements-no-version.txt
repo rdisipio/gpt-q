@@ -14,9 +14,5 @@ matplotlib
 seaborn
 scikit-learn
 sentence-transformers
-jupyterlab
-jupyterlab
 torch
-cuquantum
-cuquantum-python
 

@@ -291,10 +291,14 @@ class GPTBase(L.LightningModule):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, inputs, src_mask=None):
-        token_ids = [torch.LongTensor(x).to(self.device) for x in inputs['input_ids']]
+        #token_ids = [torch.LongTensor(x).to(self.device) for x in inputs['input_ids']]
+        token_ids = [x for x in inputs['input_ids']]
         token_ids = pad_sequence(token_ids, self.max_seq_len)
-        token_type_ids = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs.get('token_type_ids', torch.zeros_like(token_ids))], self.max_seq_len)
-        attention_mask = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs.get('attention_mask', torch.zeros_like(token_ids))], self.max_seq_len)
+        #token_type_ids = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs.get('token_type_ids', torch.zeros_like(token_ids))], self.max_seq_len)
+        #attention_mask = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs.get('attention_mask', torch.zeros_like(token_ids))], self.max_seq_len)
+        token_type_ids = pad_sequence([x.to(self.device) for x in inputs.get('token_type_ids', torch.zeros_like(token_ids))], self.max_seq_len)
+        attention_mask = pad_sequence([x.to(self.device) for x in inputs.get('attention_mask', torch.zeros_like(token_ids))], self.max_seq_len)
+
         if src_mask is None:
             src_mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0).to(self.device)

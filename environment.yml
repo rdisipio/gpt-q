@@ -1,4 +1,4 @@
-name: base
+name: qml
 channels:
   - defaults
 dependencies:
@@ -83,6 +83,3 @@ dependencies:
   - zlib=1.2.13=h5eee18b_0
   - zstandard=0.19.0=py311h5eee18b_0
   - zstd=1.5.5=hc292b87_0
-  - pip:
-      - pip==24.0
-prefix: /home/ec2-user/miniconda3
