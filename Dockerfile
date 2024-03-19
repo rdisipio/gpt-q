@@ -6,10 +6,7 @@ WORKDIR /home/idies
 
 COPY environment.yml /home/idies
 COPY requirements-no-version.txt /home/idies
-RUN ( conda init bash && \
-      bash -c "conda env create --name qml --file=environment.yml && \
-      conda activate qml && \
-      pip install -r requirements-no-version.txt" \
-)
-
-USER root
+RUN   conda init bash && \
+      conda env create --name qml --file=environment.yml && \
+      source activate qml && \
+      pip install -r requirements-no-version.txt
