@@ -1,5 +1,6 @@
 import math
 import copy
+import logging
 from datetime import datetime
 
 import torch
@@ -18,6 +19,9 @@ from pennylane import numpy as np
 #from pennylane.templates import RandomLayers
 
 from utils import pad_sequence, make_padding_mask
+
+
+logger = logging.getLogger(__name__)
 
 
 class QConv1d(L.LightningModule):
@@ -287,10 +291,13 @@ class GPTBase(L.LightningModule):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, inputs, src_mask=None):
-        token_ids = [torch.LongTensor(x).to(self.device) for x in inputs['input_ids']]
+        #token_ids = [torch.LongTensor(x).to(self.device) for x in inputs['input_ids']]
+        token_ids = [x for x in inputs['input_ids']]
         token_ids = pad_sequence(token_ids, self.max_seq_len)
-        token_type_ids = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs['token_type_ids']], self.max_seq_len)
-        attention_mask = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs['attention_mask']], self.max_seq_len)
+        #token_type_ids = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs.get('token_type_ids', torch.zeros_like(token_ids))], self.max_seq_len)
+        #attention_mask = pad_sequence([torch.LongTensor(x).to(self.device) for x in inputs.get('attention_mask', torch.zeros_like(token_ids))], self.max_seq_len)
+        token_type_ids = pad_sequence([x.to(self.device) for x in inputs.get('token_type_ids', torch.zeros_like(token_ids))], self.max_seq_len)
+        attention_mask = pad_sequence([x.to(self.device) for x in inputs.get('attention_mask', torch.zeros_like(token_ids))], self.max_seq_len)
         if src_mask is None:
             src_mask = self.attn_mask
         pos_ids = torch.arange(0, token_ids.size(-1)).unsqueeze(0).to(self.device)
@@ -303,7 +310,7 @@ class GPTBase(L.LightningModule):
         x = self.ln_f(x)
         if not self.batch_first:
             x = torch.transpose(x, 0, 1) # eg (5,16,8)->(16,5,8)
-        print(">> gptq")
+        logger.debug(">>> GPTQ called")
         return {
                 'input_ids': token_ids,
                 'token_type_ids': token_type_ids,
@@ -397,7 +404,7 @@ class IMDbClassifierBase(L.LightningModule):
 class IMDbClassifier(IMDbClassifierBase, GPT2):
     def __init__(self,
                  embed_dim,
-                 # vocab_size: int=2000,
+                 vocab_size: int=2000,
                  n_heads: int=4,
                  dropout_rate: float=0.1,
                  n_tlayers: int=1,
@@ -406,15 +413,15 @@ class IMDbClassifier(IMDbClassifierBase, GPT2):
         IMDbClassifierBase.__init__(self, lr=lr)
         GPT2.__init__(self,
             embed_dim=embed_dim,
-            # src_vocab=vocab_size,
-            tgt_vocab=2,
+            tgt_vocab=vocab_size,
             n_heads=n_heads,
             dropout_rate=dropout_rate,
             n_tlayers=n_tlayers,
             max_seq_len=max_seq_len)
 
-    def forward(self, token_ids, src_mask=None):
-        x = GPT2.forward(self, token_ids, src_mask)
+    def forward(self, X, src_mask=None):
+        x = GPT2.forward(self, X)
+        x = x['token_embeddings']
         x = x.mean(dim=1)  # average across tokens for each embedding dim
         logits = self.out(x)
         return logits
@@ -423,7 +430,7 @@ class IMDbClassifier(IMDbClassifierBase, GPT2):
 class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
     def __init__(self,
                  embed_dim,
-                 # vocab_size: int=2000,
+                 vocab_size: int=2000,
                  n_heads: int=4,
                  dropout_rate: float=0.1,
                  n_tlayers: int=1,
@@ -434,8 +441,7 @@ class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
         IMDbClassifierBase.__init__(self, lr=lr)
         GPTQ.__init__(self,
             embed_dim=embed_dim,
-            # src_vocab=vocab_size,
-            tgt_vocab=2,
+            tgt_vocab=vocab_size,
             n_heads=n_heads,
             dropout_rate=dropout_rate,
             n_tlayers=n_tlayers,
@@ -443,8 +449,9 @@ class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
             n_qlayers=n_qlayers,
             q_device=q_device)
 
-    def forward(self, token_ids, src_mask=None):
-        x = GPTQ.forward(self, token_ids, src_mask)
+    def forward(self, X, src_mask=None):
+        x = GPT2.forward(self, X)
+        x = x['token_embeddings']
         x = x.mean(dim=1)  # average across tokens for each embedding dim
         logits = self.out(x)
         return logits
@@ -453,7 +460,7 @@ class IMDbClassifierQuantum(IMDbClassifierBase, GPTQ):
 class LanguageModel(GPTQ):
     def __init__(self, 
                  embed_dim,
-                 # vocab_size: int=2000,
+                 vocab_size: int=2000,
                  n_heads: int=4,
                  dropout=0.1,
                  n_layers: int=1,
